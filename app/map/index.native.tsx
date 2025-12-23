@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, TextInput, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useMapStore, PropertyData, Place } from './mapStore';
@@ -75,6 +75,7 @@ export default function MapScreen() {
   const [url, setUrl] = useState('');
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Place | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchPlaces();
@@ -132,6 +133,7 @@ export default function MapScreen() {
             style={styles.map}
             initialRegion={MALMO_CENTER}
             provider={PROVIDER_GOOGLE}
+            mapType="satellite"
             showsUserLocation={false}
             showsMyLocationButton={false}
           >
@@ -164,7 +166,7 @@ export default function MapScreen() {
 
       {/* Add Property Button */}
       <Pressable
-        style={styles.addButton}
+        style={[styles.addButton, { top: insets.top + 20 }]}
         onPress={() => setIsPanelOpen(!isPanelOpen)}
       >
         <Text style={styles.addButtonText}>
@@ -370,7 +372,7 @@ const styles = StyleSheet.create({
   addButton: {
     position: 'absolute',
     top: 20,
-    left: 20,
+    right: 20,
     backgroundColor: '#10b981',
     paddingHorizontal: 16,
     paddingVertical: 12,

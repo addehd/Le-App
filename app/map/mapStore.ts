@@ -117,9 +117,21 @@ export const useMapStore = create<MapState>((set, get) => ({
 
       console.log('📍 Fetched places from Supabase:', data?.length || 0);
       
+      // Validate and filter Supabase data to ensure it has required fields
+      const validSupabasePlaces = (data || []).filter((place: any) => {
+        const isValid = place.latitude != null && 
+                       place.longitude != null && 
+                       typeof place.latitude === 'number' && 
+                       typeof place.longitude === 'number';
+        if (!isValid) {
+          console.warn('⚠️ Skipping invalid place from Supabase:', place);
+        }
+        return isValid;
+      });
+      
       // Merge Supabase data with local properties
       const localPlaces = get().places;
-      const mergedPlaces = [...localPlaces, ...(data || [])];
+      const mergedPlaces = [...localPlaces, ...validSupabasePlaces];
       set({ places: mergedPlaces, isLoading: false });
     } catch (error) {
       console.error('Error fetching places from Supabase:', error);
