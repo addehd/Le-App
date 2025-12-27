@@ -1,0 +1,158 @@
+# Cursor Rules for React Native Expo + Supabase Project
+
+## Critical Web Bundling Issues - LESSONS LEARNED
+
+### ❌ DO NOT USE: Zustand persist middleware with complex storage adapters
+```typescript
+// AVOID - Causes import.meta errors on web
+export const useStore = create<State>()(
+  persist(
+    (set, get) => ({ ... }),
+    {
+      name: 'store',
+      storage: asyncStorage, // ❌ This breaks web builds
+    }
+  )
+);
+```
+
+### ✅ DO USE: Simple Zustand stores with manual localStorage
+```typescript
+// GOOD - Works on all platforms
+export const useStore = create<State>((set, get) => ({
+  data: loadFromLocalStorage(),
+  
+  updateData: (newData) => {
+    set({ data: newData });
+    saveToLocalStorage(newData); // Manual save
+  }
+}));
+
+// Simple localStorage helpers
+const saveToLocalStorage = (data) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('key', JSON.stringify(data));
+  }
+};
+```
+
+### Storage Strategy: Hybrid Approach
+**Use BOTH localStorage + Supabase database:**
+
+1. **localStorage** - Client-side caching for speed
+   - Instant UI updates
+   - Survives page refresh  
+   - Works offline temporarily
+
+2. **Supabase database** - Server-side persistence for sharing
+   - Data syncs across devices
+   - Friends can share data
+   - Permanent storage
+
+**Implementation pattern:**
+```typescript
+const updateData = async (newData) => {
+  // 1. Update UI immediately (localStorage)
+  set({ data: newData });
+  localStorage.setItem('cached-data', JSON.stringify(newData));
+  
+  // 2. Save to database (Supabase)
+  await supabase.from('table').upsert(newData);
+};
+```
+
+## Platform-Specific Code Patterns
+
+### Conditional imports/logic
+```typescript
+import { Platform } from 'react-native';
+
+// Platform-specific storage
+const storage = Platform.OS === 'web' 
+  ? { /* web localStorage */ }
+  : { /* native AsyncStorage */ };
+```
+
+### Metro config for web compatibility
+```javascript
+// metro.config.js - Keep it simple
+const config = getDefaultConfig(__dirname);
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && moduleName === 'react-native-maps') {
+    return { type: 'empty' };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+```
+
+## Error Debugging Strategy
+
+### When getting `import.meta` errors:
+1. **First** - Remove all Zustand persist middleware
+2. **Then** - Check if issue persists without new code
+3. **Finally** - Implement manual localStorage approach
+
+### Testing isolation:
+- Comment out store imports to isolate issues
+- Test with mock functions first
+- Add real functionality incrementally
+
+## State Management Best Practices
+
+### Authentication with Supabase
+```typescript
+// Let Supabase handle sessions, use simple state for UI
+const useAuthStore = create((set) => ({
+  user: null,
+  
+  initialize: () => {
+    supabase.auth.onAuthStateChange((event, session) => {
+      set({ user: session?.user ?? null });
+    });
+  }
+}));
+```
+
+### Data persistence pattern
+```typescript
+const useDataStore = create((set, get) => ({
+  items: loadFromCache(),
+  
+  addItem: async (item) => {
+    // Optimistic update
+    const newItems = [...get().items, item];
+    set({ items: newItems });
+    saveToCache(newItems);
+    
+    // Sync to database
+    try {
+      await supabase.from('items').insert(item);
+    } catch (error) {
+      // Revert on error
+      set({ items: get().items.filter(i => i.id !== item.id) });
+    }
+  }
+}));
+```
+
+## Key Dependencies & Versions
+- React Native: 0.81.5
+- Expo: ~54.0.30
+- Supabase: ^2.39.3
+- Zustand: ^5.0.8
+
+## Verification Requirements
+
+### Never claim something doesn't work without verification
+- **Always verify** with actual testing before declaring functionality broken
+- Use **Playwright MCP** to test UI/functionality when available
+- Use **curl** or similar tools to verify endpoints (check for 404s, etc.)
+- Test in the actual environment before concluding failure
+- Avoid premature negative conclusions based on assumptions
+
+## Remember
+- **Simple is better** - Avoid complex middleware when possible
+- **Test web builds** frequently during development
+- **Cache locally, persist remotely** for best UX
+- **Platform checks** for web-specific code
