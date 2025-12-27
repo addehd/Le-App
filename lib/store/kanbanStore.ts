@@ -1,6 +1,6 @@
 import { asyncStorage } from './persistence';
-import type { Column } from '../../app/kanban/components/Column';
-import type { Card } from '../../app/kanban/components/Card';
+import type { Column } from '../../app/kanban/_components/Column';
+import type { Card } from '../../app/kanban/_components/Card';
 
 // Default columns structure for new projects
 export const DEFAULT_COLUMNS: Column[] = [

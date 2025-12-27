@@ -124,7 +124,7 @@ export default function MapScreen() {
           <Text style={styles.errorTitle}>Error Loading Places</Text>
           <Text style={styles.errorMessage}>{error}</Text>
           <Text style={styles.errorHint}>
-            Make sure you've configured your Supabase credentials in lib/api/supabaseClient.ts
+            Make sure you&apos;ve configured your Supabase credentials in lib/api/supabaseClient.ts
           </Text>
         </View>
       ) : (
@@ -159,7 +159,7 @@ export default function MapScreen() {
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No places found</Text>
           <Text style={styles.emptyHint}>
-            Make sure the 'hem' table exists in your Supabase database
+            Make sure the &apos;hem&apos; table exists in your Supabase database
           </Text>
         </View>
       )}

@@ -35,6 +35,8 @@ export default function RootLayout() {
         <Stack.Screen name="kanban" options={{ title: 'Kanban' }} />
         <Stack.Screen name="kanban/[projectId]" options={{ title: 'Kanban Project' }} />
         <Stack.Screen name="map" options={{ title: 'Map' }} />
+        <Stack.Screen name="auth" options={{ title: 'Authentication' }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="bidding" options={{ title: 'Bidding Strategy' }} />
         <Stack.Screen name="details" options={{ title: 'Details' }} />
         <Stack.Screen name="draggable" options={{ title: 'Draggable Examples' }} />
