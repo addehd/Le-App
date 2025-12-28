@@ -43,47 +43,103 @@ export const useLinkStore = create<LinkState>((set, get) => ({
 
   fetchOGData: async (url: string) => {
     try {
-      let title = url;
-      let description = '';
-      let image = '';
-
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        title = 'YouTube Video';
-        description = 'Video content from YouTube';
-        image = 'https://via.placeholder.com/300x200?text=YouTube';
-      } else if (url.includes('github.com')) {
-        title = 'GitHub Repository';
-        description = 'Code repository on GitHub';
-        image = 'https://via.placeholder.com/300x200?text=GitHub';
-      } else if (url.includes('twitter.com') || url.includes('x.com')) {
-        title = 'Twitter/X Post';
-        description = 'Social media post';
-        image = 'https://via.placeholder.com/300x200?text=Twitter';
-      } else if (url.includes('linkedin.com')) {
-        title = 'LinkedIn Post';
-        description = 'Professional network content';
-        image = 'https://via.placeholder.com/300x200?text=LinkedIn';
-      } else {
-        try {
-          const urlObj = new URL(url);
-          title = urlObj.hostname.replace('www.', '');
-          description = `Content from ${title}`;
-          image = 'https://via.placeholder.com/300x200?text=Link';
-        } catch {
-          title = 'Shared Link';
-          description = 'Link shared by user';
-          image = 'https://via.placeholder.com/300x200?text=Link';
-        }
+      // Validate URL
+      let urlObj: URL;
+      try {
+        urlObj = new URL(url);
+      } catch {
+        throw new Error('Invalid URL format');
       }
 
-      return { title, description, image };
+      let html: string;
+
+      // Try to fetch the URL using CORS proxy
+      try {
+        // Use AllOrigins CORS proxy
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl, {
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        html = await response.text();
+      } catch (error) {
+        console.error('Failed to fetch URL:', error);
+        // Return fallback data based on domain
+        return {
+          title: urlObj.hostname.replace('www.', ''),
+          description: `Content from ${urlObj.hostname.replace('www.', '')}`,
+          image: ''
+        };
+      }
+
+      // Parse HTML to extract OG tags
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Helper to get meta tag content
+      const getMetaContent = (property: string, name?: string): string => {
+        // Try property attribute first (for og: tags)
+        let element = doc.querySelector(`meta[property="${property}"]`);
+        if (element) {
+          return element.getAttribute('content') || '';
+        }
+
+        // Try name attribute (for other meta tags)
+        if (name) {
+          element = doc.querySelector(`meta[name="${name}"]`);
+          if (element) {
+            return element.getAttribute('content') || '';
+          }
+        }
+
+        return '';
+      };
+
+      // Extract OG metadata
+      const title = getMetaContent('og:title') ||
+                    getMetaContent('', 'twitter:title') ||
+                    doc.querySelector('title')?.textContent?.trim() ||
+                    urlObj.hostname.replace('www.', '');
+
+      const description = getMetaContent('og:description') ||
+                         getMetaContent('', 'twitter:description') ||
+                         getMetaContent('', 'description') ||
+                         '';
+
+      const image = getMetaContent('og:image') ||
+                   getMetaContent('', 'twitter:image') ||
+                   '';
+
+      console.log('Fetched OG data for', url, { title, description, image });
+
+      return {
+        title: title.trim(),
+        description: description.trim(),
+        image: image.trim()
+      };
     } catch (error) {
       console.error('Error fetching OG data:', error);
-      return {
-        title: 'Shared Link',
-        description: 'Link shared by user',
-        image: 'https://via.placeholder.com/300x200?text=Link'
-      };
+      // Return URL as fallback
+      try {
+        const urlObj = new URL(url);
+        return {
+          title: urlObj.hostname.replace('www.', ''),
+          description: '',
+          image: ''
+        };
+      } catch {
+        return {
+          title: 'Shared Link',
+          description: '',
+          image: ''
+        };
+      }
     }
   },
 

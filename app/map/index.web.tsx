@@ -2,95 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../lib/store/simpleAuthStore';
 import { useLinkStore } from '../../lib/store/simpleLinkStore';
 
-interface PropertyData {
-  address: {
-    street: string;
-    area: string;
-    city: string;
-  };
-  property_type: string;
-  rooms: {
-    total: number;
-    bedrooms: number;
-  };
-  area: {
-    living_space: number;
-    unit: string;
-  };
-  status: string;
-  floor: {
-    current: number;
-    total: number;
-  };
-  built_year: number;
-  energy_class: string;
-  monthly_fee: {
-    amount: number;
-    currency: string;
-  };
-  highlights: string[];
-}
-
-const MOCK_PROPERTY_DATA: PropertyData = {
-  address: {
-    street: "Roskildevägen 9B",
-    area: "Dammfri",
-    city: "Malmö"
-  },
-  property_type: "Lägenhet",
-  rooms: {
-    total: 4,
-    bedrooms: 3
-  },
-  area: {
-    living_space: 106.5,
-    unit: "m²"
-  },
-  status: "Snart till salu",
-  floor: {
-    current: 2,
-    total: 6
-  },
-  built_year: 1964,
-  energy_class: "D",
-  monthly_fee: {
-    amount: 6992,
-    currency: "kr"
-  },
-  highlights: [
-    "Stilfullt renovera fyra med stor gårdsvänd balkong",
-    "Stor balkong i sydväst",
-    "Smakfullt renoverat",
-    "Genomgående planlösning",
-    "Smakfull interiör",
-    "Kvalitativa materialval",
-    "Vinkyl & arbetsbänk i kompositsten",
-    "Sociala sällskapsytor",
-    "Enhetlig interiör",
-    "Genomtänkt förvaring",
-    "Badrum & WC",
-    "Egen tvättutrustning",
-    "Möjlighet till parkeringsplats",
-    "Hiss i huset",
-    "Övernattningsrum i brf",
-    "Attraktiv adress",
-    "Inivid Pildammsparken",
-    "Promenad till Triangeln",
-    "Matbutiker & service",
-    "Brett restaurangutbud",
-    "Goda kommunikationer"
-  ]
-};
-
 export default function MapScreen() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [url, setUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [propertyData, setPropertyData] = useState<PropertyData | null>(null);
   const [activeTab, setActiveTab] = useState<'property' | 'links'>('property');
-  
+
   const { user, initialize } = useAuthStore();
-  const { sharedLinks, addLink, removeLink, isLoading: isLinkLoading } = useLinkStore();
+  const { sharedLinks, addLink, removeLink, isLoading } = useLinkStore();
 
   useEffect(() => {
     initialize();
@@ -98,30 +16,14 @@ export default function MapScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
-
-    if (activeTab === 'property') {
-      setIsLoading(true);
-      setPropertyData(null);
-
-      // Simulate loading for 3 seconds
-      setTimeout(() => {
-        setPropertyData(MOCK_PROPERTY_DATA);
-        setIsLoading(false);
-      }, 3000);
-    } else if (activeTab === 'links') {
-      await handleShareLink();
-    }
-  };
-
-  const handleShareLink = async () => {
     if (!url.trim() || !user) return;
 
     try {
+      // Both tabs now use the same addLink function with real OG fetching
       await addLink(url, user.email!, Math.random() * 180 - 90, Math.random() * 360 - 180);
       setUrl('');
     } catch (error) {
-      console.error('Error sharing link:', error);
+      console.error('Error adding link:', error);
     }
   };
 
@@ -219,7 +121,7 @@ export default function MapScreen() {
           </div>
 
           <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '700', color: '#1f2937' }}>
-            {activeTab === 'property' ? 'Add Property from URL' : 'Share a Link'}
+            Add Property Link
           </h2>
 
           {/* URL Input Form */}
@@ -229,7 +131,7 @@ export default function MapScreen() {
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder={activeTab === 'property' ? 'https://property-site.com' : 'https://example.com'}
+                placeholder="https://property-site.com"
                 style={{
                   flex: 1,
                   padding: '12px',
@@ -238,44 +140,44 @@ export default function MapScreen() {
                   fontSize: '14px',
                   outline: 'none',
                 }}
-                disabled={isLoading || isLinkLoading}
+                disabled={isLoading}
               />
               <button
                 type="submit"
-                disabled={(isLoading || isLinkLoading) || !url.trim() || (activeTab === 'links' && !user)}
+                disabled={isLoading || !url.trim() || !user}
                 style={{
-                  backgroundColor: (isLoading || isLinkLoading) || !url.trim() || (activeTab === 'links' && !user) ? '#9ca3af' : '#3b82f6',
+                  backgroundColor: isLoading || !url.trim() || !user ? '#9ca3af' : '#3b82f6',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '12px 24px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: (isLoading || isLinkLoading) || !url.trim() || (activeTab === 'links' && !user) ? 'not-allowed' : 'pointer',
+                  cursor: isLoading || !url.trim() || !user ? 'not-allowed' : 'pointer',
                 }}
               >
-                {(isLoading || isLinkLoading) ? 'Loading...' : (activeTab === 'property' ? 'Scrape' : 'Share')}
+                {isLoading ? 'Loading...' : 'Add'}
               </button>
             </div>
           </form>
 
           {/* Authentication Warning */}
-          {activeTab === 'links' && !user && (
-            <div style={{ 
-              backgroundColor: '#fef2f2', 
-              border: '1px solid #fecaca', 
-              borderRadius: '8px', 
-              padding: '12px', 
-              marginBottom: '24px' 
+          {!user && (
+            <div style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '24px'
             }}>
               <p style={{ margin: 0, color: '#dc2626', fontSize: '14px' }}>
-                Please sign in to share links. <a href="/auth" style={{ textDecoration: 'underline' }}>Go to Auth</a>
+                Please sign in to add links. <a href="/auth" style={{ textDecoration: 'underline' }}>Go to Auth</a>
               </p>
             </div>
           )}
 
           {/* Loading State */}
-          {(isLoading || isLinkLoading) && (
+          {isLoading && (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <div
                 style={{
@@ -289,7 +191,7 @@ export default function MapScreen() {
                 }}
               />
               <p style={{ marginTop: '16px', color: '#6b7280' }}>
-                {activeTab === 'property' ? 'Scraping property data...' : 'Sharing link...'}
+                Fetching link data...
               </p>
               <style>
                 {`
@@ -302,111 +204,79 @@ export default function MapScreen() {
             </div>
           )}
 
-          {/* Property Data Display */}
-          {activeTab === 'property' && propertyData && !isLoading && (
-            <div style={{ backgroundColor: '#f9fafb', padding: '20px', borderRadius: '12px' }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
-                {propertyData.address.street}, {propertyData.address.city}
-              </h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Property Type</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>{propertyData.property_type}</p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Rooms</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>
-                    {propertyData.rooms.total} ({propertyData.rooms.bedrooms} bedrooms)
-                  </p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Area</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>
-                    {propertyData.area.living_space} {propertyData.area.unit}
-                  </p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Status</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>{propertyData.status}</p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Floor</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>
-                    {propertyData.floor.current} / {propertyData.floor.total}
-                  </p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Built Year</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>{propertyData.built_year}</p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Energy Class</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>{propertyData.energy_class}</p>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Monthly Fee</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#1f2937' }}>
-                    {propertyData.monthly_fee.amount} {propertyData.monthly_fee.currency}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Highlights</p>
-                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px', color: '#1f2937' }}>
-                  {propertyData.highlights.slice(0, 5).map((highlight, index) => (
-                    <li key={index} style={{ marginBottom: '4px' }}>{highlight}</li>
-                  ))}
-                  {propertyData.highlights.length > 5 && (
-                    <li style={{ marginBottom: '4px', color: '#6b7280', fontStyle: 'italic' }}>
-                      ...and {propertyData.highlights.length - 5} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* Shared Links Display */}
-          {activeTab === 'links' && !isLinkLoading && (
+          {/* Property Links Display */}
+          {!isLoading && (
             <div>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
-                Shared Links ({sharedLinks.length})
+                Property Links ({sharedLinks.length})
               </h3>
               
               {sharedLinks.length === 0 ? (
-                <div style={{ 
-                  backgroundColor: '#f9fafb', 
-                  padding: '40px', 
-                  borderRadius: '12px', 
-                  textAlign: 'center' 
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  padding: '40px',
+                  borderRadius: '12px',
+                  textAlign: 'center'
                 }}>
-                  <p style={{ margin: 0, color: '#6b7280' }}>No links shared yet</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>No property links added yet</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {sharedLinks.map((link) => (
-                    <div key={link.id} style={{ 
-                      backgroundColor: '#f9fafb', 
-                      padding: '16px', 
+                    <div key={link.id} style={{
+                      backgroundColor: '#f9fafb',
+                      padding: '16px',
                       borderRadius: '8px',
                       border: '1px solid #e5e7eb'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
-                            {link.title || 'Shared Link'}
-                          </h4>
+                      <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+                        {link.image && (
+                          <img
+                            src={link.image}
+                            alt={link.title || 'Property image'}
+                            style={{
+                              width: '120px',
+                              height: '80px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              flexShrink: 0
+                            }}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
+                            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                              {link.title || 'Property Link'}
+                            </h4>
+                            <button
+                              onClick={() => removeLink(link.id)}
+                              style={{
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                marginLeft: '12px',
+                                flexShrink: 0
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
                           <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#6b7280' }}>
                             {link.description}
                           </p>
-                          <a 
-                            href={link.url} 
-                            target="_blank" 
+                          <a
+                            href={link.url}
+                            target="_blank"
                             rel="noopener noreferrer"
-                            style={{ 
-                              fontSize: '12px', 
+                            style={{
+                              fontSize: '12px',
                               color: '#3b82f6',
                               textDecoration: 'none',
                               wordBreak: 'break-all'
@@ -415,21 +285,6 @@ export default function MapScreen() {
                             {link.url}
                           </a>
                         </div>
-                        <button
-                          onClick={() => removeLink(link.id)}
-                          style={{
-                            backgroundColor: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '4px 8px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            marginLeft: '12px'
-                          }}
-                        >
-                          Remove
-                        </button>
                       </div>
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#9ca3af' }}>
