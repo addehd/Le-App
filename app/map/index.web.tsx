@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
+import Map, { Marker } from 'react-map-gl/maplibre';
 import { useAuthStore } from '../../lib/store/simpleAuthStore';
 import { useLinkStore } from '../../lib/store/simpleLinkStore';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+// Valle Sagrado, Peru coordinates (Cusco region)
+const INITIAL_VIEW_STATE = {
+  longitude: -71.9589,
+  latitude: -13.3048,
+  zoom: 12
+};
 
 export default function MapScreen() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -29,20 +38,36 @@ export default function MapScreen() {
 
   return (
     <div style={{ width: '100%', height: '100vh', margin: 0, padding: 0, overflow: 'hidden', position: 'relative' }}>
-      {/* Map iframe */}
-      <iframe
-        src="https://www.rikuy.one/"
-        style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'block',
-        }}
-        title="Rikuy Map - Valle Sagrado"
-        allow="geolocation"
-      />
+      {/* MapLibre Map */}
+      <Map
+        initialViewState={INITIAL_VIEW_STATE}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+      >
+        {/* Markers for shared links */}
+        {sharedLinks.map((link) => (
+          <Marker
+            key={link.id}
+            longitude={link.longitude}
+            latitude={link.latitude}
+            anchor="bottom"
+          >
+            <div
+              style={{
+                backgroundColor: '#10b981',
+                borderRadius: '50% 50% 50% 0',
+                width: '30px',
+                height: '30px',
+                transform: 'rotate(-45deg)',
+                border: '3px solid white',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                cursor: 'pointer',
+              }}
+              title={link.title || link.url}
+            />
+          </Marker>
+        ))}
+      </Map>
 
       {/* Add Property Button */}
       <button

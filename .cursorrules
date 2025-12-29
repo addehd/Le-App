@@ -1,5 +1,10 @@
 # Cursor Rules for React Native Expo + Supabase Project
 
+## Package Management
+- **Always use yarn** for installing packages and dependencies
+- Use `yarn add` instead of `npm install`
+- Use `yarn add -D` for dev dependencies
+
 ## Critical Web Bundling Issues - LESSONS LEARNED
 
 ### ❌ DO NOT USE: Zustand persist middleware with complex storage adapters
