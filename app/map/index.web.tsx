@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/maplibre';
 import { useAuthStore } from '../../lib/store/simpleAuthStore';
 import { useLinkStore } from '../../lib/store/simpleLinkStore';
+import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // Valle Sagrado, Peru coordinates (Cusco region)
@@ -17,24 +18,44 @@ export default function MapScreen() {
   const [activeTab, setActiveTab] = useState<'property' | 'links'>('property');
 
   const { user, initialize } = useAuthStore();
-  const { sharedLinks, addLink, removeLink, isLoading } = useLinkStore();
+  const { sharedLinks, addLink, removeLink, isLoading: isLinkLoading } = useLinkStore();
+  const {
+    propertyLinks,
+    addPropertyLink,
+    removePropertyLink,
+    isLoading: isPropertyLoading,
+    loadFromDatabase
+  } = usePropertyLinkStore();
 
   useEffect(() => {
     initialize();
+    loadFromDatabase(); // Load property links from Supabase
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim() || !user) return;
+    if (!url.trim()) return;
 
     try {
-      // Both tabs now use the same addLink function with real OG fetching
-      await addLink(url, user.email!, Math.random() * 180 - 90, Math.random() * 360 - 180);
+      const sharedBy = user?.email || 'anon';
+      const lat = Math.random() * 180 - 90;
+      const lng = Math.random() * 360 - 180;
+
+      if (activeTab === 'property') {
+        // Add property link with property-specific data extraction
+        await addPropertyLink(url, sharedBy, lat, lng);
+      } else {
+        // Add regular shared link
+        await addLink(url, sharedBy, lat, lng);
+      }
       setUrl('');
     } catch (error) {
       console.error('Error adding link:', error);
     }
   };
+
+  const isLoading = activeTab === 'property' ? isPropertyLoading : isLinkLoading;
+  const currentLinks = activeTab === 'property' ? propertyLinks : sharedLinks;
 
   return (
     <div style={{ width: '100%', height: '100vh', margin: 0, padding: 0, overflow: 'hidden', position: 'relative' }}>
@@ -44,10 +65,34 @@ export default function MapScreen() {
         style={{ width: '100%', height: '100%' }}
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
       >
-        {/* Markers for shared links */}
+        {/* Markers for property links (blue) */}
+        {propertyLinks.map((link) => (
+          <Marker
+            key={`property-${link.id}`}
+            longitude={link.longitude}
+            latitude={link.latitude}
+            anchor="bottom"
+          >
+            <div
+              style={{
+                backgroundColor: '#3b82f6',
+                borderRadius: '50% 50% 50% 0',
+                width: '30px',
+                height: '30px',
+                transform: 'rotate(-45deg)',
+                border: '3px solid white',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                cursor: 'pointer',
+              }}
+              title={link.title || link.url}
+            />
+          </Marker>
+        ))}
+
+        {/* Markers for shared links (green) */}
         {sharedLinks.map((link) => (
           <Marker
-            key={link.id}
+            key={`link-${link.id}`}
             longitude={link.longitude}
             latitude={link.latitude}
             anchor="bottom"
@@ -146,7 +191,7 @@ export default function MapScreen() {
           </div>
 
           <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '700', color: '#1f2937' }}>
-            Add Property Link
+            {activeTab === 'property' ? 'Add Property Link' : 'Share Links'}
           </h2>
 
           {/* URL Input Form */}
@@ -169,16 +214,16 @@ export default function MapScreen() {
               />
               <button
                 type="submit"
-                disabled={isLoading || !url.trim() || !user}
+                disabled={isLoading || !url.trim()}
                 style={{
-                  backgroundColor: isLoading || !url.trim() || !user ? '#9ca3af' : '#3b82f6',
+                  backgroundColor: isLoading || !url.trim() ? '#9ca3af' : '#3b82f6',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '12px 24px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: isLoading || !url.trim() || !user ? 'not-allowed' : 'pointer',
+                  cursor: isLoading || !url.trim() ? 'not-allowed' : 'pointer',
                 }}
               >
                 {isLoading ? 'Loading...' : 'Add'}
@@ -186,17 +231,17 @@ export default function MapScreen() {
             </div>
           </form>
 
-          {/* Authentication Warning */}
+          {/* Optional Sign-In Info */}
           {!user && (
             <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
               borderRadius: '8px',
               padding: '12px',
               marginBottom: '24px'
             }}>
-              <p style={{ margin: 0, color: '#dc2626', fontSize: '14px' }}>
-                Please sign in to add links. <a href="/auth" style={{ textDecoration: 'underline' }}>Go to Auth</a>
+              <p style={{ margin: 0, color: '#1e40af', fontSize: '14px' }}>
+                💡 Links are saved anonymously. <a href="/auth" style={{ textDecoration: 'underline', color: '#1e40af' }}>Sign in</a> to save with your account.
               </p>
             </div>
           )}
@@ -229,95 +274,164 @@ export default function MapScreen() {
             </div>
           )}
 
-          {/* Property Links Display */}
+          {/* Links Display */}
           {!isLoading && (
             <div>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
-                Property Links ({sharedLinks.length})
+                {activeTab === 'property' ? 'Property Links' : 'Shared Links'} ({currentLinks.length})
               </h3>
-              
-              {sharedLinks.length === 0 ? (
+
+              {currentLinks.length === 0 ? (
                 <div style={{
                   backgroundColor: '#f9fafb',
                   padding: '40px',
                   borderRadius: '12px',
                   textAlign: 'center'
                 }}>
-                  <p style={{ margin: 0, color: '#6b7280' }}>No property links added yet</p>
+                  <p style={{ margin: 0, color: '#6b7280' }}>
+                    {activeTab === 'property' ? 'No property links added yet' : 'No shared links added yet'}
+                  </p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {sharedLinks.map((link) => (
-                    <div key={link.id} style={{
-                      backgroundColor: '#f9fafb',
-                      padding: '16px',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
-                        {link.image && (
-                          <img
-                            src={link.image}
-                            alt={link.title || 'Property image'}
-                            style={{
-                              width: '120px',
-                              height: '80px',
-                              objectFit: 'cover',
-                              borderRadius: '6px',
-                              flexShrink: 0
-                            }}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
-                              {link.title || 'Property Link'}
-                            </h4>
-                            <button
-                              onClick={() => removeLink(link.id)}
+                  {currentLinks.map((link) => {
+                    const isPropertyLink = 'propertyData' in link;
+                    const propertyData = isPropertyLink ? (link as any).propertyData : null;
+
+                    return (
+                      <div key={link.id} style={{
+                        backgroundColor: '#f9fafb',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+                          {link.image && (
+                            <img
+                              src={link.image}
+                              alt={link.title || 'Property image'}
                               style={{
-                                backgroundColor: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                marginLeft: '12px',
+                                width: '120px',
+                                height: '80px',
+                                objectFit: 'cover',
+                                borderRadius: '6px',
                                 flexShrink: 0
                               }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
+                              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                                {link.title || 'Property Link'}
+                              </h4>
+                              <button
+                                onClick={() => {
+                                  if (activeTab === 'property') {
+                                    removePropertyLink(link.id);
+                                  } else {
+                                    removeLink(link.id);
+                                  }
+                                }}
+                                style={{
+                                  backgroundColor: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  marginLeft: '12px',
+                                  flexShrink: 0
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+
+                            {/* Property-specific metadata */}
+                            {isPropertyLink && propertyData && (
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gap: '6px',
+                                marginBottom: '8px',
+                                padding: '8px',
+                                backgroundColor: '#eff6ff',
+                                borderRadius: '4px',
+                                fontSize: '12px'
+                              }}>
+                                {propertyData.price && (
+                                  <div>
+                                    <strong>Price:</strong> {propertyData.price.toLocaleString()} {propertyData.currency || 'SEK'}
+                                  </div>
+                                )}
+                                {propertyData.bedrooms && (
+                                  <div>
+                                    <strong>Bedrooms:</strong> {propertyData.bedrooms}
+                                  </div>
+                                )}
+                                {propertyData.bathrooms && (
+                                  <div>
+                                    <strong>Bathrooms:</strong> {propertyData.bathrooms}
+                                  </div>
+                                )}
+                                {propertyData.area && (
+                                  <div>
+                                    <strong>Area:</strong> {propertyData.area} {propertyData.areaUnit || 'm²'}
+                                  </div>
+                                )}
+                                {propertyData.propertyType && (
+                                  <div>
+                                    <strong>Type:</strong> {propertyData.propertyType}
+                                  </div>
+                                )}
+                                {propertyData.address && (
+                                  <div style={{ gridColumn: '1 / -1' }}>
+                                    <strong>Address:</strong> {propertyData.address}
+                                  </div>
+                                )}
+                                {propertyData.energyClass && (
+                                  <div>
+                                    <strong>Energy:</strong> {propertyData.energyClass}
+                                  </div>
+                                )}
+                                {propertyData.builtYear && (
+                                  <div>
+                                    <strong>Built:</strong> {propertyData.builtYear}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#6b7280' }}>
+                              {link.description}
+                            </p>
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontSize: '12px',
+                                color: '#3b82f6',
+                                textDecoration: 'none',
+                                wordBreak: 'break-all'
+                              }}
                             >
-                              Remove
-                            </button>
+                              {link.url}
+                            </a>
                           </div>
-                          <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#6b7280' }}>
-                            {link.description}
-                          </p>
-                          <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              fontSize: '12px',
-                              color: '#3b82f6',
-                              textDecoration: 'none',
-                              wordBreak: 'break-all'
-                            }}
-                          >
-                            {link.url}
-                          </a>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#9ca3af' }}>
+                          <span>Shared by: {link.sharedBy}</span>
+                          <span>{new Date(link.sharedAt).toLocaleDateString()}</span>
                         </div>
                       </div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#9ca3af' }}>
-                        <span>Shared by: {link.sharedBy}</span>
-                        <span>{new Date(link.sharedAt).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
