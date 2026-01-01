@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="auth" options={{ title: 'Authentication' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="bidding" options={{ title: 'Bidding Strategy' }} />
+        <Stack.Screen name="compare" options={{ title: 'Compare Properties' }} />
         <Stack.Screen name="details" options={{ title: 'Details' }} />
         <Stack.Screen name="draggable" options={{ title: 'Draggable Examples' }} />
         <Stack.Screen name="card-demo" options={{ title: 'Card Demo' }} />

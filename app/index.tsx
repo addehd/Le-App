@@ -21,6 +21,9 @@ export default function HomeScreen() {
             <Link href="/bidding" asChild>
               <button className="flex-1 min-w-[160px] bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors">Bidding</button>
             </Link>
+            <Link href="/compare" asChild>
+              <button className="flex-1 min-w-[160px] bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors">Compare</button>
+            </Link>
           </div>
         </div>
       </div>
@@ -45,8 +48,13 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
         <Link href="/bidding" asChild>
-          <Pressable className="w-full bg-orange-600 px-4 py-3 rounded-lg">
+          <Pressable className="w-full bg-orange-600 px-4 py-3 rounded-lg mb-3">
             <Text className="text-white text-center font-semibold">Bidding</Text>
+          </Pressable>
+        </Link>
+        <Link href="/compare" asChild>
+          <Pressable className="w-full bg-purple-600 px-4 py-3 rounded-lg">
+            <Text className="text-white text-center font-semibold">Compare</Text>
           </Pressable>
         </Link>
       </View>
