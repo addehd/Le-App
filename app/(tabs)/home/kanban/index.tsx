@@ -109,7 +109,7 @@ export default function KanbanOverviewScreen() {
               <p className="text-base text-gray-300">Select a project to view its kanban board</p>
             </div>
             <div className="flex gap-2">
-              <Link href="/map" asChild>
+              <Link href="/(tabs)/map" asChild>
                 <button className="shrink-0 inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
                   <span>🗺️ Map</span>
                 </button>
@@ -334,7 +334,7 @@ export default function KanbanOverviewScreen() {
             <Text className="text-base text-gray-600">Select a project to view its kanban board</Text>
           </View>
           <View className="flex-row gap-2">
-            <Link href="/map" asChild>
+            <Link href="/(tabs)/map" asChild>
               <Pressable className="bg-green-600 px-4 py-2 rounded-lg">
                 <Text className="text-white font-medium">🗺️ Map</Text>
               </Pressable>

@@ -202,7 +202,7 @@ export default function ProfileScreen() {
 
       <TouchableOpacity
         className="mt-4 bg-purple-500 py-3 rounded-lg"
-        onPress={() => router.push('/map')}
+        onPress={() => router.push('/(tabs)/map')}
       >
         <Text className="text-white text-center font-semibold">Go to Map</Text>
       </TouchableOpacity>
