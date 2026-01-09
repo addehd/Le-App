@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS property_links (
   image TEXT,
   shared_by TEXT NOT NULL DEFAULT 'anon',
   shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  latitude DOUBLE PRECISION NOT NULL,
-  longitude DOUBLE PRECISION NOT NULL,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   property_data JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -36,15 +36,13 @@ CREATE POLICY "Authenticated users can insert property links"
   FOR INSERT
   WITH CHECK (auth.email() = shared_by);
 
--- Policy: Anonymous users can insert if location and link are present
-CREATE POLICY "Anonymous users can insert property links with location"
+-- Policy: Anonymous users can insert if link is present
+CREATE POLICY "Anonymous users can insert property links"
   ON property_links
   FOR INSERT
   WITH CHECK (
     shared_by = 'anon'
     AND url IS NOT NULL
-    AND latitude IS NOT NULL
-    AND longitude IS NOT NULL
   );
 
 -- Policy: Users can delete their own property links

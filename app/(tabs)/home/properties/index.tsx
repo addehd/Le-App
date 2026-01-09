@@ -203,6 +203,9 @@ export default function PropertiesScreen() {
     try {
       // Fetch OG data using feature-local API
       const ogData = await fetchOGData(url);
+
+
+      console.log('OG data:', ogData);
       
       // Save to store with fetched data
       const sharedBy = user?.email || 'anon';
@@ -248,7 +251,7 @@ export default function PropertiesScreen() {
 
   if (Platform.OS === 'web') {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="h-screen bg-gray-100 overflow-y-auto">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 py-4">

@@ -5,7 +5,7 @@
  * Following feature-based architecture, each feature owns its network logic.
  * 
  * Environment: EXPO_PUBLIC_CRAWLER_API_URL
- * Endpoint: /crawler-og - Fetches OG metadata from property listing URLs
+ * Endpoint: /go/crawler-og - Fetches OG metadata from property listing URLs
  */
 
 const CRAWLER_BASE_URL = process.env.EXPO_PUBLIC_CRAWLER_API_URL || '';
@@ -45,15 +45,23 @@ export async function fetchOGData(url: string): Promise<OGData> {
   }
 
   try {
-    const response = await fetch(
-      `${CRAWLER_BASE_URL}/crawler-og?url=${encodeURIComponent(url)}`
-    );
+    console.log('Fetching from:', `${CRAWLER_BASE_URL}/go/crawler-og`);
+    const response = await fetch(`${CRAWLER_BASE_URL}/go/crawler-og`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
     const data = await response.json();
+
+    console.log('OG data:', data);
+    
     return {
       title: data.title,
       description: data.description,
