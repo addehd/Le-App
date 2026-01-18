@@ -1,11 +1,11 @@
 /**
  * HTTP client for the Neu AI code generation API
- * 
- * This client communicates with the neu server (http://localhost:8080)
- * to perform AI-powered code operations.
+ *
+ * This client communicates with the neu server to perform AI-powered code operations.
+ * Configure the server URL via EXPO_PUBLIC_NEU_API_URL environment variable.
  */
 
-const NEU_BASE_URL = 'http://localhost:8080';
+const NEU_BASE_URL = process.env.EXPO_PUBLIC_NEU_API_URL || 'http://localhost:8080';
 
 export interface GenerateCodeRequest {
   prompt: string;
