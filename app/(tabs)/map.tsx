@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
+import { useAuthStore } from '../../lib/store/authStore';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
 
 // Fallback map component (used when platform-specific file not available)

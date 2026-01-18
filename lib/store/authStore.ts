@@ -1,24 +1,11 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-// import { supabase } from '../api/supabaseClient';
-// import { User, Session } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
-
-// Mock types for testing
-interface User {
-  id: string;
-  email?: string;
-}
-
-interface Session {
-  user?: User;
-}
+import { supabase } from '../api/supabaseClient';
+import { User, Session } from '@supabase/supabase-js';
 
 interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
-  avatar_url?: string;
   friends: string[];
 }
 
@@ -32,156 +19,139 @@ interface AuthState {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   initialize: () => void;
-  loadUserProfile: (userId: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   addFriend: (friendId: string) => Promise<void>;
   removeFriend: (friendId: string) => Promise<void>;
 }
 
-export const useAuthStore = Platform.OS === 'web' 
-  ? create<AuthState>()((set, get) => ({
-      user: null,
-      userProfile: null,
-      session: null,
-      isLoading: true,
-      error: null,
+// Simple localStorage helpers - check both window AND localStorage (React Native has window but no localStorage)
+const saveToLocalStorage = (key: string, data: any) => {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    window.localStorage.setItem(key, JSON.stringify(data));
+  }
+};
 
-      initialize: () => {
-        // Mock initialization for testing
-        console.log('Auth store initialized');
-        set({ isLoading: false });
-      },
+const getFromLocalStorage = (key: string) => {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    const item = window.localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  }
+  return null;
+};
 
-      loadUserProfile: async (userId: string) => {
-        console.log('Mock loadUserProfile:', userId);
-      },
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  userProfile: null,
+  session: null,
+  isLoading: true,
+  error: null,
 
-      signIn: async (email: string, password: string) => {
-        console.log('Mock signIn:', email);
-        set({ isLoading: true, error: null });
-        
-        setTimeout(() => {
-          set({ 
-            isLoading: false,
-            user: { id: '1', email },
-            session: { user: { id: '1', email } }
-          });
-        }, 1000);
-      },
+  initialize: () => {
+    // Load cached profile from localStorage
+    const cachedProfile = getFromLocalStorage('user-profile');
+    if (cachedProfile) {
+      set({ userProfile: cachedProfile });
+    }
 
-      signUp: async (email: string, password: string) => {
-        console.log('Mock signUp:', email);
-        set({ isLoading: true, error: null });
-        
-        setTimeout(() => {
-          set({ isLoading: false });
-        }, 1000);
-      },
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      set({
+        session,
+        user: session?.user ?? null,
+        isLoading: false
+      });
+    });
 
-      signOut: async () => {
-        console.log('Mock signOut');
-        set({ 
-          isLoading: false,
-          user: null,
-          session: null,
-          userProfile: null 
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        set({
+          session,
+          user: session?.user ?? null,
+          isLoading: false
         });
-      },
 
-      updateProfile: async (updates: Partial<UserProfile>) => {
-        console.log('Mock updateProfile:', updates);
-      },
-
-      addFriend: async (friendId: string) => {
-        console.log('Mock addFriend:', friendId);
-      },
-
-      removeFriend: async (friendId: string) => {
-        console.log('Mock removeFriend:', friendId);
-      },
-    }))
-  : create<AuthState>()(
-    persist(
-      (set, get) => ({
-        user: null,
-        userProfile: null,
-        session: null,
-        isLoading: true,
-        error: null,
-
-        initialize: () => {
-          console.log('Native auth store initialized');
-          set({ isLoading: false });
-        },
-
-        loadUserProfile: async (userId: string) => {
-          console.log('Native mock loadUserProfile:', userId);
-        },
-
-        signIn: async (email: string, password: string) => {
-          console.log('Native mock signIn:', email);
-          set({ isLoading: true });
-          setTimeout(() => {
-            set({ 
-              isLoading: false,
-              user: { id: '1', email },
-              session: { user: { id: '1', email } }
-            });
-          }, 1000);
-        },
-
-        signUp: async (email: string, password: string) => {
-          console.log('Native mock signUp:', email);
-          set({ isLoading: true });
-          setTimeout(() => set({ isLoading: false }), 1000);
-        },
-
-        signOut: async () => {
-          console.log('Native mock signOut');
-          set({ 
-            user: null,
-            session: null,
-            userProfile: null,
-            isLoading: false
-          });
-        },
-
-        updateProfile: async (updates: Partial<UserProfile>) => {
-          console.log('Native mock updateProfile:', updates);
-        },
-
-        addFriend: async (friendId: string) => {
-          console.log('Native mock addFriend:', friendId);
-        },
-
-        removeFriend: async (friendId: string) => {
-          console.log('Native mock removeFriend:', friendId);
-        },
-      }),
-      {
-        name: 'auth-store',
-        storage: {
-          getItem: async (name) => {
-            try {
-              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-              return await AsyncStorage.getItem(name);
-            } catch {
-              return null;
-            }
-          },
-          setItem: async (name, value) => {
-            try {
-              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-              await AsyncStorage.setItem(name, value);
-            } catch {}
-          },
-          removeItem: async (name) => {
-            try {
-              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-              await AsyncStorage.removeItem(name);
-            } catch {}
-          },
-        } as any,
+        if (!session?.user) {
+          set({ userProfile: null });
+          saveToLocalStorage('user-profile', null);
+        }
       }
-    )
-  );
+    );
+
+    return () => subscription?.unsubscribe?.();
+  },
+
+  signIn: async (email: string, password: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      set({ error: error.message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  signUp: async (email: string, password: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      set({ error: error.message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  signOut: async () => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      set({ userProfile: null });
+      saveToLocalStorage('user-profile', null);
+    } catch (error: any) {
+      set({ error: error.message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateProfile: async (updates: Partial<UserProfile>) => {
+    const { userProfile } = get();
+    if (!userProfile) return;
+
+    const updatedProfile = { ...userProfile, ...updates };
+    set({ userProfile: updatedProfile });
+    saveToLocalStorage('user-profile', updatedProfile);
+  },
+
+  addFriend: async (friendId: string) => {
+    const { userProfile } = get();
+    if (!userProfile) return;
+
+    const updatedFriends = [...userProfile.friends, friendId];
+    await get().updateProfile({ friends: updatedFriends });
+  },
+
+  removeFriend: async (friendId: string) => {
+    const { userProfile } = get();
+    if (!userProfile) return;
+
+    const updatedFriends = userProfile.friends.filter(id => id !== friendId);
+    await get().updateProfile({ friends: updatedFriends });
+  },
+}));

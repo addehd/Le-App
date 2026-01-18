@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
+import { useAuthStore } from '../../lib/store/authStore';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');

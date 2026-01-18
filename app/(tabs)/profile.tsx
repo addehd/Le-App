@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Platform, View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
+import { useAuthStore } from '../../lib/store/authStore';
 
 export default function ProfileTab() {
   const [fullName, setFullName] = useState('');

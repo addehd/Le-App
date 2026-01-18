@@ -11,17 +11,44 @@
 const CRAWLER_BASE_URL = process.env.EXPO_PUBLIC_CRAWLER_API_URL || '';
 
 /**
+ * Raw OG metadata from the crawler
+ */
+export interface RawOGMetadata {
+  'country-name'?: string[];
+  description?: string[];
+  image?: string[];
+  latitude?: string[];
+  longitude?: string[];
+  'office-city'?: string[];
+  'office-name'?: string[];
+  'office-region'?: string[];
+  'postal-code'?: string[];
+  'site_name'?: string[];
+  'street-address'?: string[];
+  title?: string[];
+  type?: string[];
+  url?: string[];
+}
+
+/**
  * Open Graph data returned from the crawler API
  */
 export interface OGData {
   title?: string;
   description?: string;
   image?: string;
-  // Extended property data if API returns it
-  price?: number;
-  currency?: string;
+  url?: string;
   address?: string;
   city?: string;
+  latitude?: number;
+  longitude?: number;
+  postalCode?: string;
+  country?: string;
+  officeName?: string;
+  officeRegion?: string;
+  siteName?: string;
+  price?: number;
+  currency?: string;
   area?: number;
   areaUnit?: string;
   bedrooms?: number;
@@ -45,7 +72,6 @@ export async function fetchOGData(url: string): Promise<OGData> {
   }
 
   try {
-    console.log('Fetching from:', `${CRAWLER_BASE_URL}/go/crawler-og`);
     const response = await fetch(`${CRAWLER_BASE_URL}/go/crawler-og`, {
       method: 'POST',
       headers: {
@@ -59,6 +85,7 @@ export async function fetchOGData(url: string): Promise<OGData> {
     }
 
     const data = await response.json();
+    const og: RawOGMetadata = data.og || {};
 
     console.log('OG data:', data);
     
@@ -66,10 +93,18 @@ export async function fetchOGData(url: string): Promise<OGData> {
       title: data.title,
       description: data.description,
       image: data.image,
-      price: data.price,
-      currency: data.currency,
+      url: data.url,
       address: data.address,
       city: data.city,
+      latitude: og.latitude?.[0] ? parseFloat(og.latitude[0]) : undefined,
+      longitude: og.longitude?.[0] ? parseFloat(og.longitude[0]) : undefined,
+      postalCode: og['postal-code']?.[0],
+      country: og['country-name']?.[0],
+      officeName: og['office-name']?.[0],
+      officeRegion: og['office-region']?.[0],
+      siteName: og['site_name']?.[0],
+      price: data.price,
+      currency: data.currency,
       area: data.area,
       areaUnit: data.areaUnit,
       bedrooms: data.bedrooms,

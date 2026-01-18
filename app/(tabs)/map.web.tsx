@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/maplibre';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
-import { useLinkStore } from '../../lib/store/simpleLinkStore';
+import { useAuthStore } from '../../lib/store/authStore';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
+import { hasValidCoordinates } from '../../lib/utils/coordinates';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // Valle Sagrado, Peru coordinates (Cusco region)
@@ -15,10 +15,8 @@ const INITIAL_VIEW_STATE = {
 export default function MapTab() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [url, setUrl] = useState('');
-  const [activeTab, setActiveTab] = useState<'property' | 'links'>('property');
 
   const { user, initialize } = useAuthStore();
-  const { sharedLinks, addLink, removeLink, isLoading: isLinkLoading } = useLinkStore();
   const {
     propertyLinks,
     addPropertyLink,
@@ -41,19 +39,30 @@ export default function MapTab() {
       const lat = Math.random() * 180 - 90;
       const lng = Math.random() * 360 - 180;
 
-      if (activeTab === 'property') {
-        await addPropertyLink(url, sharedBy, lat, lng);
-      } else {
-        await addLink(url, sharedBy, lat, lng);
-      }
+      await addPropertyLink(url, sharedBy, lat, lng);
       setUrl('');
     } catch (error) {
       console.error('Error adding link:', error);
     }
   };
 
-  const isLoading = activeTab === 'property' ? isPropertyLoading : isLinkLoading;
-  const currentLinks = activeTab === 'property' ? propertyLinks : sharedLinks;
+  const isLoading = isPropertyLoading;
+  const currentLinks = propertyLinks;
+
+  // Filter links with valid coordinates to prevent NaN errors
+  const validPropertyLinks = propertyLinks.filter(link => {
+    const isValid = hasValidCoordinates(link);
+    if (!isValid) {
+      console.warn('⚠️ Property link missing valid coordinates:', {
+        id: link.id,
+        url: link.url,
+        latitude: link.latitude,
+        longitude: link.longitude,
+      });
+    }
+    return isValid;
+  });
+
 
   return (
     <div style={{ width: '100%', height: '100%', margin: 0, padding: 0, overflow: 'hidden', position: 'relative' }}>
@@ -64,7 +73,7 @@ export default function MapTab() {
         mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
       >
         {/* Markers for property links (blue) */}
-        {propertyLinks.map((link) => (
+        {validPropertyLinks.map((link) => (
           <Marker
             key={`property-${link.id}`}
             longitude={link.longitude}
@@ -87,29 +96,6 @@ export default function MapTab() {
           </Marker>
         ))}
 
-        {/* Markers for shared links (green) */}
-        {sharedLinks.map((link) => (
-          <Marker
-            key={`link-${link.id}`}
-            longitude={link.longitude}
-            latitude={link.latitude}
-            anchor="bottom"
-          >
-            <div
-              style={{
-                backgroundColor: '#10b981',
-                borderRadius: '50% 50% 50% 0',
-                width: '30px',
-                height: '30px',
-                transform: 'rotate(-45deg)',
-                border: '3px solid white',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                cursor: 'pointer',
-              }}
-              title={link.title || link.url}
-            />
-          </Marker>
-        ))}
       </Map>
 
       {/* Add Property Button */}
@@ -152,44 +138,8 @@ export default function MapTab() {
             zIndex: 999,
           }}
         >
-          {/* Tabs */}
-          <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
-            <button
-              onClick={() => setActiveTab('property')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                backgroundColor: activeTab === 'property' ? '#3b82f6' : 'transparent',
-                color: activeTab === 'property' ? 'white' : '#6b7280',
-                border: 'none',
-                borderRadius: '8px 8px 0 0',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Add Property
-            </button>
-            <button
-              onClick={() => setActiveTab('links')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                backgroundColor: activeTab === 'links' ? '#3b82f6' : 'transparent',
-                color: activeTab === 'links' ? 'white' : '#6b7280',
-                border: 'none',
-                borderRadius: '8px 8px 0 0',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Share Links
-            </button>
-          </div>
-
           <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '700', color: '#1f2937' }}>
-            {activeTab === 'property' ? 'Add Property Link' : 'Share Links'}
+            Add Property Link
           </h2>
 
           {/* URL Input Form */}
@@ -268,41 +218,60 @@ export default function MapTab() {
           {!isLoading && (
             <div>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
-                {activeTab === 'property' ? 'Property Links' : 'Shared Links'} ({currentLinks.length})
+                Property Links ({currentLinks.length})
               </h3>
 
               {currentLinks.length === 0 ? (
                 <div style={{ backgroundColor: '#f9fafb', padding: '40px', borderRadius: '12px', textAlign: 'center' }}>
                   <p style={{ margin: 0, color: '#6b7280' }}>
-                    {activeTab === 'property' ? 'No property links added yet' : 'No shared links added yet'}
+                    No property links added yet
                   </p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto' }}>
-                  {currentLinks.map((link) => (
-                    <div key={link.id} style={{ backgroundColor: '#f9fafb', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '600' }}>{link.title || 'Link'}</h4>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{link.url}</p>
+                  {currentLinks.map((link) => {
+                    const hasCoords = hasValidCoordinates(link);
+                    return (
+                      <div
+                        key={link.id}
+                        style={{
+                          backgroundColor: '#f9fafb',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: `1px solid ${hasCoords ? '#e5e7eb' : '#fbbf24'}`,
+                          opacity: hasCoords ? 1 : 0.7,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '600' }}>
+                              {link.title || 'Link'}
+                              {!hasCoords && (
+                                <span style={{ color: '#f59e0b', marginLeft: '8px', fontSize: '12px' }}>
+                                  ⚠ No location
+                                </span>
+                              )}
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{link.url}</p>
+                          </div>
+                          <button
+                            onClick={() => removePropertyLink(link.id)}
+                            style={{
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Remove
+                          </button>
                         </div>
-                        <button
-                          onClick={() => activeTab === 'property' ? removePropertyLink(link.id) : removeLink(link.id)}
-                          style={{
-                            backgroundColor: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '4px 8px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Remove
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

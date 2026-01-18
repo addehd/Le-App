@@ -1,6 +1,6 @@
 import { Platform, View, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { KanbanBoard } from './_components/KanbanBoard';
+import { KanbanBoard } from '../(tabs)/home/kanban/_components/KanbanBoard';
 
 export default function KanbanProjectScreen() {
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();

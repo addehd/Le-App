@@ -3,7 +3,7 @@ import { Platform, View, Text, Pressable, ScrollView, TextInput, Image, Linking 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { usePropertyLinkStore, PropertyLink } from '../../../../lib/store/propertyLinkStore';
-import { useAuthStore } from '../../../../lib/store/simpleAuthStore';
+import { useAuthStore } from '../../../../lib/store/authStore';
 import { fetchOGData } from './api';
 
 function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove: () => void }) {

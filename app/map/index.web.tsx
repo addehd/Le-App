@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/maplibre';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
-import { useLinkStore } from '../../lib/store/simpleLinkStore';
+import { useAuthStore } from '../../lib/store/authStore';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -15,10 +14,7 @@ const INITIAL_VIEW_STATE = {
 export default function MapScreen() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [url, setUrl] = useState('');
-  const [activeTab, setActiveTab] = useState<'property' | 'links'>('property');
-
   const { user, initialize } = useAuthStore();
-  const { sharedLinks, addLink, removeLink, isLoading: isLinkLoading } = useLinkStore();
   const {
     propertyLinks,
     addPropertyLink,
@@ -41,21 +37,16 @@ export default function MapScreen() {
       const lat = Math.random() * 180 - 90;
       const lng = Math.random() * 360 - 180;
 
-      if (activeTab === 'property') {
-        // Add property link with property-specific data extraction
-        await addPropertyLink(url, sharedBy, lat, lng);
-      } else {
-        // Add regular shared link
-        await addLink(url, sharedBy, lat, lng);
-      }
+      // Add property link with property-specific data extraction
+      await addPropertyLink(url, sharedBy, lat, lng);
       setUrl('');
     } catch (error) {
       console.error('Error adding link:', error);
     }
   };
 
-  const isLoading = activeTab === 'property' ? isPropertyLoading : isLinkLoading;
-  const currentLinks = activeTab === 'property' ? propertyLinks : sharedLinks;
+  const isLoading = isPropertyLoading;
+  const currentLinks = propertyLinks;
 
   return (
     <div style={{ width: '100%', height: '100vh', margin: 0, padding: 0, overflow: 'hidden', position: 'relative' }}>
@@ -90,28 +81,6 @@ export default function MapScreen() {
         ))}
 
         {/* Markers for shared links (green) */}
-        {sharedLinks.map((link) => (
-          <Marker
-            key={`link-${link.id}`}
-            longitude={link.longitude}
-            latitude={link.latitude}
-            anchor="bottom"
-          >
-            <div
-              style={{
-                backgroundColor: '#10b981',
-                borderRadius: '50% 50% 50% 0',
-                width: '30px',
-                height: '30px',
-                transform: 'rotate(-45deg)',
-                border: '3px solid white',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                cursor: 'pointer',
-              }}
-              title={link.title || link.url}
-            />
-          </Marker>
-        ))}
       </Map>
 
       {/* Add Property Button */}
@@ -154,44 +123,8 @@ export default function MapScreen() {
             zIndex: 999,
           }}
         >
-          {/* Tabs */}
-          <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
-            <button
-              onClick={() => setActiveTab('property')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                backgroundColor: activeTab === 'property' ? '#3b82f6' : 'transparent',
-                color: activeTab === 'property' ? 'white' : '#6b7280',
-                border: 'none',
-                borderRadius: '8px 8px 0 0',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Add Property
-            </button>
-            <button
-              onClick={() => setActiveTab('links')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                backgroundColor: activeTab === 'links' ? '#3b82f6' : 'transparent',
-                color: activeTab === 'links' ? 'white' : '#6b7280',
-                border: 'none',
-                borderRadius: '8px 8px 0 0',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Share Links
-            </button>
-          </div>
-
           <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: '700', color: '#1f2937' }}>
-            {activeTab === 'property' ? 'Add Property Link' : 'Share Links'}
+            Add Property Link
           </h2>
 
           {/* URL Input Form */}
@@ -278,7 +211,7 @@ export default function MapScreen() {
           {!isLoading && (
             <div>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
-                {activeTab === 'property' ? 'Property Links' : 'Shared Links'} ({currentLinks.length})
+                Property Links ({currentLinks.length})
               </h3>
 
               {currentLinks.length === 0 ? (
@@ -289,7 +222,7 @@ export default function MapScreen() {
                   textAlign: 'center'
                 }}>
                   <p style={{ margin: 0, color: '#6b7280' }}>
-                    {activeTab === 'property' ? 'No property links added yet' : 'No shared links added yet'}
+                    No property links added yet
                   </p>
                 </div>
               ) : (
@@ -328,13 +261,7 @@ export default function MapScreen() {
                                 {link.title || 'Property Link'}
                               </h4>
                               <button
-                                onClick={() => {
-                                  if (activeTab === 'property') {
-                                    removePropertyLink(link.id);
-                                  } else {
-                                    removeLink(link.id);
-                                  }
-                                }}
+                                onClick={() => removePropertyLink(link.id)}
                                 style={{
                                   backgroundColor: '#ef4444',
                                   color: 'white',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
+import { useAuthStore } from '../../lib/store/authStore';
 // import { supabase } from '../../lib/api/supabaseClient';
 
 interface Friend {

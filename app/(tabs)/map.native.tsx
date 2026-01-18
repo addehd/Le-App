@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { useAuthStore } from '../../lib/store/simpleAuthStore';
+import { useAuthStore } from '../../lib/store/authStore';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
+import { hasValidCoordinates } from '../../lib/utils/coordinates';
 
 // Valle Sagrado, Peru coordinates (Cusco region)
 const INITIAL_REGION = {
@@ -44,6 +45,9 @@ export default function MapTab() {
     }
   };
 
+  // Filter links with valid coordinates to prevent crashes
+  const validPropertyLinks = propertyLinks.filter(hasValidCoordinates);
+
   return (
     <View style={styles.container}>
       <MapView
@@ -51,7 +55,7 @@ export default function MapTab() {
         initialRegion={INITIAL_REGION}
         provider={PROVIDER_GOOGLE}
       >
-        {propertyLinks.map((link) => (
+        {validPropertyLinks.map((link) => (
           <Marker
             key={link.id}
             coordinate={{
