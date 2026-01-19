@@ -9,6 +9,9 @@ export default defineConfig({
     // Enable globals (no need to import describe/test/expect)
     globals: true,
 
+    // Setup files
+    setupFiles: ['__tests__/setup/vitest.setup.ts'],
+
     // Test file patterns
     include: ['**/__tests__/**/*.test.{ts,tsx}'],
 
