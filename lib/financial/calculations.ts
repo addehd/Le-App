@@ -18,73 +18,178 @@ function roundPercentage(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-export interface MortgageParams {
-  principal: number;        // loan amount
-  annualInterestRate: number; // as decimal (0.06 for 6%)
-  loanTermYears: number;    // 15, 30, etc.
+/**
+ * Format a number as Swedish currency (SEK).
+ * Uses Swedish locale with space as thousand separator.
+ */
+export function formatCurrencySEK(value: number): string {
+  return new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+/**
+ * Format a number with Swedish thousand separator (space).
+ */
+export function formatNumberSE(value: number): string {
+  return new Intl.NumberFormat('sv-SE').format(value);
+}
+
+// Swedish mortgage parameters
+export interface SwedishMortgageParams {
+  purchasePrice: number;
+  downPaymentPercent: number;  // Must be >= 15% (85% LTV cap - bolånetak)
+  annualInterestRate: number;
+  loanTermYears: number;
+  propertyType: 'villa' | 'brf';  // Affects maintenance costs
 }
 
 export interface MortgageResult {
   monthlyPayment: number;
-  totalPayments: number;    // monthlyPayment × months
-  totalInterest: number;    // totalPayments - principal
+  monthlyInterest: number;
+  monthlyAmortization: number;
+  amortizationPercent: number;
+  amortizationReason: string;
+  totalPayments: number;
+  totalInterest: number;
+  ltv: number;
 }
 
-export interface TotalCostParams {
+export interface AmortizationResult {
+  monthlyAmortization: number;
+  yearlyAmortizationPercent: number;  // 0%, 1%, 2%, or 3%
+  reason: string;  // Explanation: "LTV 72% → 2% yearly" or "LTV < 50% → no requirement"
+}
+
+export interface SwedishTotalCostParams {
   purchasePrice: number;
-  mortgageParams: MortgageParams;
-  propertyTaxAnnual?: number;   // optional, varies by location
-  insuranceAnnual?: number;      // optional, varies by property
-  hoaMonthly?: number;           // optional, 0 if not applicable
-  pmiMonthly?: number;           // optional, 0 if down payment ≥ 20%
-  maintenanceRate?: number;      // optional, default 1% (0.01)
+  downPaymentPercent: number;
+  annualInterestRate: number;
+  loanTermYears: number;
+  propertyType: 'villa' | 'brf';
+  propertyTaxAnnual?: number;
+  insuranceAnnual?: number;
+  brfMonthly?: number;          // BRF-avgift (if brf property type)
+  maintenanceRate?: number;     // Default 0.01 for villa, 0 for brf (included in BRF fee)
 }
 
 export interface TotalCostResult {
   monthlyMortgage: number;
+  monthlyInterest: number;
+  monthlyAmortization: number;
   monthlyPropertyTax: number;
   monthlyInsurance: number;
-  monthlyHOA: number;
-  monthlyPMI: number;
+  monthlyBRF: number;
   monthlyMaintenance: number;
   totalMonthly: number;
   totalAnnual: number;
 }
 
-export interface DTIParams {
+export interface SwedishAffordabilityParams {
   grossMonthlyIncome: number;
-  monthlyHousingCost: number;  // from TotalCostResult.totalMonthly
-  monthlyOtherDebts: number;   // credit cards, auto loans, student loans, etc.
+  monthlyHousingCost: number;
+  monthlyOtherDebts: number;
+  stressTestRate: number;       // Kalkylränta (typically 5-7%)
+  totalDebt?: number;            // For amorteringskrav 3rd rule
+  grossAnnualIncome?: number;    // For amorteringskrav 3rd rule
 }
 
-export interface DTIResult {
-  frontEndDTI: number;         // percentage
-  backEndDTI: number;          // percentage
-  canAffordConventional: boolean;  // backEndDTI ≤ 50%
-  canAffordFHA: boolean;           // frontEndDTI ≤ 31% && backEndDTI ≤ 43%
-  canAffordIdeal: boolean;         // backEndDTI ≤ 36%
+export interface AffordabilityResult {
+  housingCostRatio: number;
+  totalDebtRatio: number;
+  stressTestRate: number;
+  canAffordConservative: boolean;
+  canAffordStandard: boolean;
+  reasoning: string;
 }
 
 /**
- * Calculate monthly mortgage payment using the PMT formula.
+ * Calculate mandatory amortization (amorteringskrav) per Swedish mortgage rules.
  *
- * Formula: A = P × [r(1 + r)^n] / [(1 + r)^n - 1]
- * Where:
- *   A = monthly payment amount
- *   P = mortgage principal (loan amount)
- *   r = monthly interest rate (annual rate / 12)
- *   n = loan term in months
+ * Swedish rules:
+ * - LTV > 70%: 2% yearly amortization
+ * - LTV 50-70%: 1% yearly amortization
+ * - LTV ≤ 50%: No requirement
+ * - Additional 1% if total debt > 4.5x gross annual income
  *
- * @param params - Mortgage parameters (principal, rate, term)
- * @returns Monthly payment, total payments, and total interest
- * @throws Error if parameters are invalid (negative principal/rate, zero/negative term)
+ * @param params - Amortization parameters
+ * @returns Monthly amortization amount and explanation
  */
-export function calculateMortgagePayment(params: MortgageParams): MortgageResult {
-  const { principal, annualInterestRate, loanTermYears } = params;
+export function calculateAmorteringskrav(params: {
+  principal: number;
+  purchasePrice: number;
+  grossAnnualIncome?: number;
+  totalDebt?: number;
+}): AmortizationResult {
+  const ltv = (params.principal / params.purchasePrice) * 100;
+
+  let yearlyPercent = 0;
+  let reason = '';
+
+  // Rule 1: LTV-based amortization
+  if (ltv > 70) {
+    yearlyPercent = 2;
+    reason = `LTV ${ltv.toFixed(1)}% > 70% → 2% yearly`;
+  } else if (ltv > 50) {
+    yearlyPercent = 1;
+    reason = `LTV ${ltv.toFixed(1)}% (50-70%) → 1% yearly`;
+  } else {
+    reason = `LTV ${ltv.toFixed(1)}% ≤ 50% → no requirement`;
+  }
+
+  // Rule 2: Additional 1% if total debt > 4.5x gross income
+  if (params.grossAnnualIncome && params.totalDebt) {
+    const debtToIncome = params.totalDebt / params.grossAnnualIncome;
+    if (debtToIncome > 4.5) {
+      yearlyPercent += 1;
+      reason += ` + 1% (debt ${debtToIncome.toFixed(1)}x income > 4.5x)`;
+    }
+  }
+
+  const monthlyAmortization = (params.principal * (yearlyPercent / 100)) / 12;
+
+  return {
+    monthlyAmortization: roundCurrency(monthlyAmortization),
+    yearlyAmortizationPercent: yearlyPercent,
+    reason
+  };
+}
+
+/**
+ * Calculate monthly mortgage payment for Swedish market (with amorteringskrav).
+ *
+ * Swedish mortgage payment includes:
+ * - Interest component (PMT formula)
+ * - Mandatory amortization (amorteringskrav: 0-3% yearly based on LTV)
+ *
+ * Enforces 85% LTV cap (bolånetak).
+ *
+ * @param params - Swedish mortgage parameters
+ * @returns Monthly payment breakdown with interest, amortization, and LTV
+ * @throws Error if LTV > 85% or parameters invalid
+ */
+export function calculateMortgagePayment(params: SwedishMortgageParams): MortgageResult {
+  const { purchasePrice, downPaymentPercent, annualInterestRate, loanTermYears } = params;
+
+  // Calculate principal and LTV
+  const downPayment = purchasePrice * (downPaymentPercent / 100);
+  const principal = purchasePrice - downPayment;
+  const ltv = (principal / purchasePrice) * 100;
+
+  // Validate 85% LTV cap (bolånetak)
+  if (ltv > 85) {
+    throw new Error(`LTV ${ltv.toFixed(1)}% exceeds 85% bolånetak (loan cap). Minimum down payment is 15%.`);
+  }
 
   // Validate inputs
-  if (principal < 0) {
-    throw new Error('Principal must be non-negative');
+  if (purchasePrice <= 0) {
+    throw new Error('Purchase price must be positive');
+  }
+  if (downPaymentPercent < 0 || downPaymentPercent > 100) {
+    throw new Error('Down payment percent must be between 0 and 100');
   }
   if (annualInterestRate < 0) {
     throw new Error('Interest rate must be non-negative');
@@ -93,125 +198,139 @@ export function calculateMortgagePayment(params: MortgageParams): MortgageResult
     throw new Error('Loan term must be positive');
   }
 
-  // Handle zero principal edge case
-  if (principal === 0) {
-    return {
-      monthlyPayment: 0,
-      totalPayments: 0,
-      totalInterest: 0,
-    };
-  }
-
-  // Convert to monthly values
+  // Calculate interest-only payment using PMT formula
   const monthlyRate = annualInterestRate / 12;
-  const numberOfPayments = loanTermYears * 12;
+  const numPayments = loanTermYears * 12;
 
-  // Handle 0% interest edge case (simple division)
+  let monthlyInterest: number;
   if (annualInterestRate === 0) {
-    const monthlyPayment = principal / numberOfPayments;
-    return {
-      monthlyPayment: roundCurrency(monthlyPayment),
-      totalPayments: roundCurrency(principal),
-      totalInterest: 0,
-    };
+    monthlyInterest = 0;  // 0% interest edge case
+  } else {
+    const factor = Math.pow(1 + monthlyRate, numPayments);
+    monthlyInterest = principal * (monthlyRate * factor) / (factor - 1);
   }
 
-  // PMT formula: A = P × [r(1 + r)^n] / [(1 + r)^n - 1]
-  const factor = Math.pow(1 + monthlyRate, numberOfPayments);
-  const monthlyPayment = principal * (monthlyRate * factor) / (factor - 1);
+  // Calculate mandatory amortization (amorteringskrav)
+  const amortization = calculateAmorteringskrav({
+    principal,
+    purchasePrice
+  });
 
-  // Round monthly payment first, then calculate total based on rounded value
-  const roundedMonthlyPayment = roundCurrency(monthlyPayment);
-  const totalPayments = roundedMonthlyPayment * numberOfPayments;
+  const monthlyPayment = monthlyInterest + amortization.monthlyAmortization;
+  const totalPayments = monthlyPayment * numPayments;
   const totalInterest = totalPayments - principal;
 
   return {
-    monthlyPayment: roundedMonthlyPayment,
+    monthlyPayment: roundCurrency(monthlyPayment),
+    monthlyInterest: roundCurrency(monthlyInterest),
+    monthlyAmortization: amortization.monthlyAmortization,
+    amortizationPercent: amortization.yearlyAmortizationPercent,
+    amortizationReason: amortization.reason,
     totalPayments: roundCurrency(totalPayments),
     totalInterest: roundCurrency(totalInterest),
+    ltv: roundPercentage(ltv)
   };
 }
 
 /**
- * Calculate total monthly cost of homeownership.
+ * Calculate total monthly cost of homeownership (Swedish market).
  *
- * Includes: mortgage payment, property taxes, insurance, HOA, PMI, and maintenance.
+ * Includes: mortgage payment (interest + amortization), property taxes, insurance, BRF fee, and maintenance.
+ * Note: PMI doesn't exist in Sweden. Maintenance only applies to villas (included in BRF for apartments).
  *
- * @param params - Total cost parameters
+ * @param params - Swedish total cost parameters
  * @returns Breakdown of monthly costs and total
  */
-export function calculateTotalCost(params: TotalCostParams): TotalCostResult {
+export function calculateTotalCost(params: SwedishTotalCostParams): TotalCostResult {
   const {
     purchasePrice,
-    mortgageParams,
+    downPaymentPercent,
+    annualInterestRate,
+    loanTermYears,
+    propertyType,
     propertyTaxAnnual = 0,
     insuranceAnnual = 0,
-    hoaMonthly = 0,
-    pmiMonthly = 0,
-    maintenanceRate = 0.01, // Default 1%
+    brfMonthly = 0,
+    maintenanceRate
   } = params;
 
-  // Calculate mortgage payment
-  const mortgageResult = calculateMortgagePayment(mortgageParams);
-  const monthlyMortgage = mortgageResult.monthlyPayment;
+  // Calculate mortgage payment (includes amortization)
+  const mortgage = calculateMortgagePayment({
+    purchasePrice,
+    downPaymentPercent,
+    annualInterestRate,
+    loanTermYears,
+    propertyType
+  });
 
-  // Convert annual costs to monthly
+  // Monthly costs
   const monthlyPropertyTax = roundCurrency(propertyTaxAnnual / 12);
   const monthlyInsurance = roundCurrency(insuranceAnnual / 12);
+  const monthlyBRF = brfMonthly;
 
-  // Calculate monthly maintenance based on purchase price
-  const monthlyMaintenance = roundCurrency((purchasePrice * maintenanceRate) / 12);
+  // Maintenance: 1% for villa, 0 for brf (included in BRF fee)
+  const effectiveMaintenanceRate = propertyType === 'villa'
+    ? (maintenanceRate !== undefined ? maintenanceRate : 0.01)
+    : 0;
+  const monthlyMaintenance = roundCurrency((purchasePrice * effectiveMaintenanceRate) / 12);
 
-  // Sum all components
-  const totalMonthly = monthlyMortgage + monthlyPropertyTax + monthlyInsurance +
-                       hoaMonthly + pmiMonthly + monthlyMaintenance;
-  const totalAnnual = totalMonthly * 12;
+  const totalMonthly =
+    mortgage.monthlyPayment +
+    monthlyPropertyTax +
+    monthlyInsurance +
+    monthlyBRF +
+    monthlyMaintenance;
 
   return {
-    monthlyMortgage: roundCurrency(monthlyMortgage),
+    monthlyMortgage: mortgage.monthlyPayment,
+    monthlyInterest: mortgage.monthlyInterest,
+    monthlyAmortization: mortgage.monthlyAmortization,
     monthlyPropertyTax,
     monthlyInsurance,
-    monthlyHOA: hoaMonthly,
-    monthlyPMI: pmiMonthly,
+    monthlyBRF,
     monthlyMaintenance,
     totalMonthly: roundCurrency(totalMonthly),
-    totalAnnual: roundCurrency(totalAnnual),
+    totalAnnual: roundCurrency(totalMonthly * 12)
   };
 }
 
 /**
- * Calculate debt-to-income ratios for mortgage affordability.
+ * Calculate affordability using Swedish kalkylränta (stress test).
  *
- * Two ratios:
- *   - Front-end DTI: Housing costs only (percentage of income)
- *   - Back-end DTI: All debts including housing (percentage of income)
+ * Swedish banks test affordability at a higher "stress test rate" (kalkylränta),
+ * typically 5-7%, even if actual rate is lower. This ensures borrowers can afford
+ * the mortgage if rates increase.
  *
- * @param params - DTI parameters (income, housing cost, other debts)
- * @returns DTI percentages and affordability flags
+ * Swedish thresholds (more conservative than US):
+ * - Housing cost should be < 50% of gross income at stress test rate (very conservative)
+ * - Total debt should be < 60% of gross income at stress test rate (standard)
+ *
+ * @param params - Swedish affordability parameters with stress test rate
+ * @returns Affordability ratios and flags
  * @throws Error if income is zero or negative
  */
-export function calculateDTI(params: DTIParams): DTIResult {
-  const { grossMonthlyIncome, monthlyHousingCost, monthlyOtherDebts } = params;
+export function calculateAffordability(params: SwedishAffordabilityParams): AffordabilityResult {
+  const { grossMonthlyIncome, monthlyHousingCost, monthlyOtherDebts, stressTestRate } = params;
 
   // Validate income
   if (grossMonthlyIncome <= 0) {
     throw new Error('Gross monthly income must be positive');
   }
 
-  // Calculate DTI ratios
-  const frontEndDTI = (monthlyHousingCost / grossMonthlyIncome) * 100;
-  const backEndDTI = ((monthlyHousingCost + monthlyOtherDebts) / grossMonthlyIncome) * 100;
+  // Calculate ratios at stress test rate
+  const housingRatio = (monthlyHousingCost / grossMonthlyIncome) * 100;
+  const totalDebtRatio = ((monthlyHousingCost + monthlyOtherDebts) / grossMonthlyIncome) * 100;
 
-  // Affordability thresholds
-  const canAffordConventional = backEndDTI <= 50;
-  const canAffordFHA = frontEndDTI <= 31 && backEndDTI <= 43;
-  const canAffordIdeal = backEndDTI <= 36;
+  // Swedish affordability thresholds
+  const canAffordConservative = totalDebtRatio <= 50;  // Very conservative
+  const canAffordStandard = totalDebtRatio <= 60;      // Standard Swedish threshold
 
   return {
-    frontEndDTI: roundPercentage(frontEndDTI),
-    backEndDTI: roundPercentage(backEndDTI),
-    canAffordConventional,
-    canAffordFHA,
-    canAffordIdeal,
+    housingCostRatio: roundPercentage(housingRatio),
+    totalDebtRatio: roundPercentage(totalDebtRatio),
+    stressTestRate,
+    canAffordConservative,
+    canAffordStandard,
+    reasoning: `At ${stressTestRate}% kalkylränta: housing ${housingRatio.toFixed(1)}%, total debt ${totalDebtRatio.toFixed(1)}%`
   };
 }
