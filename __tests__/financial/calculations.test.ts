@@ -33,9 +33,9 @@ describe('Financial Calculations', () => {
 
       const result = calculateMortgagePayment(params);
 
-      expect(result.monthlyPayment).toBeCloseTo(2372.74, 2);
-      expect(result.totalPayments).toBeCloseTo(427093.20, 2);
-      expect(result.totalInterest).toBeCloseTo(127093.20, 2);
+      expect(result.monthlyPayment).toBeCloseTo(2372.38, 2);
+      expect(result.totalPayments).toBeCloseTo(427028.40, 2);
+      expect(result.totalInterest).toBeCloseTo(127028.40, 2);
     });
 
     test('calculates monthly payment for $200k loan at 7% for 30 years', () => {
@@ -141,8 +141,8 @@ describe('Financial Calculations', () => {
       // Maintenance: (500000 * 0.01) / 12 = ~416.67
       expect(result.monthlyMaintenance).toBeCloseTo(416.67, 2);
       // Total: sum of all above
-      expect(result.totalMonthly).toBeCloseTo(3598.53, 2);
-      expect(result.totalAnnual).toBeCloseTo(43182.36, 2);
+      expect(result.totalMonthly).toBeCloseTo(3598.20, 2);
+      expect(result.totalAnnual).toBeCloseTo(43178.40, 2);
     });
 
     test('uses default 1% maintenance rate when not provided', () => {
@@ -219,8 +219,8 @@ describe('Financial Calculations', () => {
       expect(result.backEndDTI).toBeCloseTo(38, 1);
       // Can afford conventional: 38% <= 50%
       expect(result.canAffordConventional).toBe(true);
-      // Can afford FHA: 28% <= 31% (no) OR 38% <= 43% (yes)
-      expect(result.canAffordFHA).toBe(false); // front-end is 28% but back-end is 38%
+      // Can afford FHA: 28% <= 31% AND 38% <= 43% (both true)
+      expect(result.canAffordFHA).toBe(true);
       // Can afford ideal: 38% <= 36% (no)
       expect(result.canAffordIdeal).toBe(false);
     });
