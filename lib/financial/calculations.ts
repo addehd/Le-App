@@ -4,6 +4,20 @@
  * All functions are pure and testable, following TDD methodology.
  */
 
+/**
+ * Round a number to 2 decimal places (for currency values).
+ */
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Round a number to 1 decimal place (for percentages).
+ */
+function roundPercentage(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 export interface MortgageParams {
   principal: number;        // loan amount
   annualInterestRate: number; // as decimal (0.06 for 6%)
@@ -96,8 +110,8 @@ export function calculateMortgagePayment(params: MortgageParams): MortgageResult
   if (annualInterestRate === 0) {
     const monthlyPayment = principal / numberOfPayments;
     return {
-      monthlyPayment: Math.round(monthlyPayment * 100) / 100,
-      totalPayments: Math.round(principal * 100) / 100,
+      monthlyPayment: roundCurrency(monthlyPayment),
+      totalPayments: roundCurrency(principal),
       totalInterest: 0,
     };
   }
@@ -107,14 +121,14 @@ export function calculateMortgagePayment(params: MortgageParams): MortgageResult
   const monthlyPayment = principal * (monthlyRate * factor) / (factor - 1);
 
   // Round monthly payment first, then calculate total based on rounded value
-  const roundedMonthlyPayment = Math.round(monthlyPayment * 100) / 100;
+  const roundedMonthlyPayment = roundCurrency(monthlyPayment);
   const totalPayments = roundedMonthlyPayment * numberOfPayments;
   const totalInterest = totalPayments - principal;
 
   return {
     monthlyPayment: roundedMonthlyPayment,
-    totalPayments: Math.round(totalPayments * 100) / 100,
-    totalInterest: Math.round(totalInterest * 100) / 100,
+    totalPayments: roundCurrency(totalPayments),
+    totalInterest: roundCurrency(totalInterest),
   };
 }
 
@@ -142,11 +156,11 @@ export function calculateTotalCost(params: TotalCostParams): TotalCostResult {
   const monthlyMortgage = mortgageResult.monthlyPayment;
 
   // Convert annual costs to monthly
-  const monthlyPropertyTax = Math.round((propertyTaxAnnual / 12) * 100) / 100;
-  const monthlyInsurance = Math.round((insuranceAnnual / 12) * 100) / 100;
+  const monthlyPropertyTax = roundCurrency(propertyTaxAnnual / 12);
+  const monthlyInsurance = roundCurrency(insuranceAnnual / 12);
 
   // Calculate monthly maintenance based on purchase price
-  const monthlyMaintenance = Math.round(((purchasePrice * maintenanceRate) / 12) * 100) / 100;
+  const monthlyMaintenance = roundCurrency((purchasePrice * maintenanceRate) / 12);
 
   // Sum all components
   const totalMonthly = monthlyMortgage + monthlyPropertyTax + monthlyInsurance +
@@ -154,14 +168,14 @@ export function calculateTotalCost(params: TotalCostParams): TotalCostResult {
   const totalAnnual = totalMonthly * 12;
 
   return {
-    monthlyMortgage: Math.round(monthlyMortgage * 100) / 100,
+    monthlyMortgage: roundCurrency(monthlyMortgage),
     monthlyPropertyTax,
     monthlyInsurance,
     monthlyHOA: hoaMonthly,
     monthlyPMI: pmiMonthly,
     monthlyMaintenance,
-    totalMonthly: Math.round(totalMonthly * 100) / 100,
-    totalAnnual: Math.round(totalAnnual * 100) / 100,
+    totalMonthly: roundCurrency(totalMonthly),
+    totalAnnual: roundCurrency(totalAnnual),
   };
 }
 
@@ -194,8 +208,8 @@ export function calculateDTI(params: DTIParams): DTIResult {
   const canAffordIdeal = backEndDTI <= 36;
 
   return {
-    frontEndDTI: Math.round(frontEndDTI * 10) / 10,
-    backEndDTI: Math.round(backEndDTI * 10) / 10,
+    frontEndDTI: roundPercentage(frontEndDTI),
+    backEndDTI: roundPercentage(backEndDTI),
     canAffordConventional,
     canAffordFHA,
     canAffordIdeal,
