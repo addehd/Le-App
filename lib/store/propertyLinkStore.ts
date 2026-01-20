@@ -12,7 +12,7 @@ export interface PropertyLinkData {
   city?: string;
   postalCode?: string;
   country?: string;
-  
+
   // Property Details (Stage 2: LLM enrichment)
   bedrooms?: number;
   bathrooms?: number;
@@ -22,27 +22,62 @@ export interface PropertyLinkData {
   floor?: string | number;
   buildYear?: number;
   propertyType?: string;  // apartment, house, villa, etc.
-  
+
   // Financial (LLM)
   monthlyFee?: number;    // avgift
   operatingCost?: number; // driftskostnad
-  
+
   // Features (LLM)
   elevator?: string | boolean;
   balcony?: string | boolean;
   parking?: string | boolean;
   features?: string[];    // array of feature strings
-  
+
   // Legacy field
   energyClass?: string;
-  
+
   // Metadata
   source?: string;        // hemnet, blocket, etc.
   publishedDate?: string;
-  
+
   // Enrichment tracking
   enrichmentStatus?: EnrichmentStatus;
   lastEnriched?: string;  // ISO timestamp
+}
+
+export interface FinancialData {
+  // Mortgage inputs
+  mortgage?: {
+    principal: number;
+    annualInterestRate: number;
+    loanTermYears: number;
+    downPayment?: number;         // optional, for calculating principal
+  };
+
+  // Total cost inputs
+  totalCost?: {
+    propertyTaxAnnual?: number;
+    insuranceAnnual?: number;
+    hoaMonthly?: number;
+    pmiMonthly?: number;
+    maintenanceRate?: number;     // default 0.01 (1%)
+  };
+
+  // Affordability inputs
+  affordability?: {
+    grossMonthlyIncome: number;
+    monthlyOtherDebts: number;
+  };
+
+  // Calculated results (cached)
+  results?: {
+    monthlyPayment?: number;
+    totalMonthly?: number;
+    frontEndDTI?: number;
+    backEndDTI?: number;
+    canAfford?: boolean;
+    calculatedAt: string;         // ISO timestamp
+  };
 }
 
 export interface PropertyLink {
@@ -57,6 +92,7 @@ export interface PropertyLink {
   latitude?: number;
   longitude?: number;
   propertyData?: PropertyLinkData;
+  financialData?: FinancialData;
 }
 
 interface PropertyLinkState {
