@@ -4,10 +4,10 @@ import { goApiClient, PROPERTY_KEYWORDS } from '../api/goApiClient';
 import {
   calculateMortgagePayment,
   calculateTotalCost,
-  calculateDTI,
-  type MortgageParams,
-  type TotalCostParams,
-  type DTIParams
+  calculateAffordability,
+  type SwedishMortgageParams,
+  type SwedishTotalCostParams,
+  type SwedishAffordabilityParams
 } from '../financial/calculations';
 
 export type EnrichmentStatus = 'og_only' | 'llm_processing' | 'llm_complete' | 'llm_failed';
@@ -54,37 +54,51 @@ export interface PropertyLinkData {
 }
 
 export interface FinancialData {
-  // Mortgage inputs
+  // Swedish mortgage inputs
   mortgage?: {
-    principal: number;
+    purchasePrice: number;
+    downPaymentPercent: number;   // Must be >= 15% (85% LTV cap)
     annualInterestRate: number;
     loanTermYears: number;
-    downPayment?: number;         // optional, for calculating principal
+    propertyType: 'villa' | 'brf';
   };
 
-  // Total cost inputs
+  // Swedish total cost inputs
   totalCost?: {
+    purchasePrice: number;
+    downPaymentPercent: number;
+    annualInterestRate: number;
+    loanTermYears: number;
+    propertyType: 'villa' | 'brf';
     propertyTaxAnnual?: number;
     insuranceAnnual?: number;
-    hoaMonthly?: number;
-    pmiMonthly?: number;
-    maintenanceRate?: number;     // default 0.01 (1%)
+    brfMonthly?: number;          // BRF-avgift (replaces hoaMonthly)
+    maintenanceRate?: number;     // Default 0.01 for villa, 0 for brf
   };
 
-  // Affordability inputs
+  // Swedish affordability inputs (kalkylränta)
   affordability?: {
     grossMonthlyIncome: number;
+    monthlyHousingCost: number;
     monthlyOtherDebts: number;
+    stressTestRate: number;       // Kalkylränta (typically 5-7%)
+    totalDebt?: number;            // For amorteringskrav 3rd rule
+    grossAnnualIncome?: number;    // For amorteringskrav 3rd rule
   };
 
   // Calculated results (cached)
   results?: {
     monthlyPayment?: number;
+    monthlyInterest?: number;
+    monthlyAmortization?: number;
+    amortizationPercent?: number;
     totalMonthly?: number;
-    frontEndDTI?: number;
-    backEndDTI?: number;
-    canAfford?: boolean;
-    calculatedAt: string;         // ISO timestamp
+    housingCostRatio?: number;     // Housing cost / income (%)
+    totalDebtRatio?: number;       // Total debt / income (%)
+    canAffordConservative?: boolean; // ≤ 50% threshold
+    canAffordStandard?: boolean;   // ≤ 60% threshold
+    ltv?: number;                  // Loan-to-value ratio
+    calculatedAt: string;          // ISO timestamp
   };
 }
 
@@ -121,9 +135,9 @@ interface PropertyLinkState {
   calculateAndSaveFinancials: (
     linkId: string,
     inputs: {
-      mortgage?: MortgageParams;
-      totalCost?: TotalCostParams;
-      affordability?: DTIParams;
+      mortgage?: SwedishMortgageParams;
+      totalCost?: SwedishTotalCostParams;
+      affordability?: SwedishAffordabilityParams;
     }
   ) => Promise<FinancialData>;
   getFinancialResults: (linkId: string) => FinancialData['results'] | null;
@@ -532,24 +546,32 @@ export const usePropertyLinkStore = create<PropertyLinkState>((set, get) => ({
   calculateAndSaveFinancials: async (linkId, inputs) => {
     let results: any = {};
 
-    // Calculate mortgage if inputs provided
+    // Calculate Swedish mortgage if inputs provided
     if (inputs.mortgage) {
       const mortgageResult = calculateMortgagePayment(inputs.mortgage);
       results.monthlyPayment = mortgageResult.monthlyPayment;
+      results.monthlyInterest = mortgageResult.monthlyInterest;
+      results.monthlyAmortization = mortgageResult.monthlyAmortization;
+      results.amortizationPercent = mortgageResult.amortizationPercent;
+      results.ltv = mortgageResult.ltv;
     }
 
-    // Calculate total cost if inputs provided
+    // Calculate Swedish total cost if inputs provided
     if (inputs.totalCost) {
       const totalCostResult = calculateTotalCost(inputs.totalCost);
       results.totalMonthly = totalCostResult.totalMonthly;
+      results.monthlyPayment = totalCostResult.monthlyMortgage;
+      results.monthlyInterest = totalCostResult.monthlyInterest;
+      results.monthlyAmortization = totalCostResult.monthlyAmortization;
     }
 
-    // Calculate DTI if inputs provided
+    // Calculate Swedish affordability (kalkylränta) if inputs provided
     if (inputs.affordability) {
-      const dtiResult = calculateDTI(inputs.affordability);
-      results.frontEndDTI = dtiResult.frontEndDTI;
-      results.backEndDTI = dtiResult.backEndDTI;
-      results.canAfford = dtiResult.canAffordIdeal;
+      const affordabilityResult = calculateAffordability(inputs.affordability);
+      results.housingCostRatio = affordabilityResult.housingCostRatio;
+      results.totalDebtRatio = affordabilityResult.totalDebtRatio;
+      results.canAffordConservative = affordabilityResult.canAffordConservative;
+      results.canAffordStandard = affordabilityResult.canAffordStandard;
     }
 
     // Build FinancialData object
