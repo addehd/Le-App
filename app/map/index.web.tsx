@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/maplibre';
-import { useAuthStore } from '../../lib/store/authStore';
+import { useAuth } from '../../lib/query/useAuth';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
 import { hasValidCoordinates } from '../../lib/utils/coordinates';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -15,7 +15,7 @@ const INITIAL_VIEW_STATE = {
 export default function MapScreen() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [url, setUrl] = useState('');
-  const { user, initialize } = useAuthStore();
+  const { user } = useAuth();
   const {
     propertyLinks,
     addPropertyLink,
@@ -25,7 +25,6 @@ export default function MapScreen() {
   } = usePropertyLinkStore();
 
   useEffect(() => {
-    initialize();
     loadFromDatabase(); // Load property links from Supabase
   }, []);
 

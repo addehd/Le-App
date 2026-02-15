@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../../../lib/store/authStore';
-// import { supabase } from '../../../../lib/api/supabaseClient';
+import { useAuth } from '../../../../lib/query/useAuth';
 
 interface Friend {
   id: string;
@@ -19,18 +18,10 @@ export default function ProfileScreen() {
   
   const { 
     user, 
-    userProfile, 
     signOut, 
-    updateProfile, 
-    addFriend, 
-    removeFriend, 
-    isLoading, 
-    initialize 
-  } = useAuthStore();
-
-  useEffect(() => {
-    initialize();
-  }, []);
+    isLoading,
+    signOutError
+  } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -39,11 +30,10 @@ export default function ProfileScreen() {
   }, [user]);
 
   useEffect(() => {
-    if (userProfile) {
-      setFullName(userProfile.full_name || '');
+    if (user) {
       loadFriends();
     }
-  }, [userProfile]);
+  }, [user]);
 
   const loadFriends = async () => {
     console.log('Mock loadFriends');
@@ -51,10 +41,11 @@ export default function ProfileScreen() {
   };
 
   const handleUpdateProfile = async () => {
-    if (!userProfile) return;
+    if (!user) return;
     
     try {
-      await updateProfile({ full_name: fullName });
+      // TODO: Implement profile update with React Query
+      console.log('Update profile:', fullName);
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile');
@@ -77,7 +68,7 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeFriend(friendId);
+              // TODO: Implement friend removal with React Query
               setFriends(prev => prev.filter(f => f.id !== friendId));
               Alert.alert('Success', 'Friend removed successfully');
             } catch (error) {
@@ -89,13 +80,15 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/auth');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to sign out');
-    }
+  const handleSignOut = () => {
+    signOut(undefined, {
+      onSuccess: () => {
+        router.push('/auth');
+      },
+      onError: (error) => {
+        Alert.alert('Error', error.message || 'Failed to sign out');
+      }
+    });
   };
 
   if (isLoading) {

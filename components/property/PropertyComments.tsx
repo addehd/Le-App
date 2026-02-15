@@ -64,7 +64,7 @@ export function PropertyComments({ propertyId }: PropertyCommentsProps) {
     ? propertyComments.find(c => c.id === replyToId)
     : null;
 
-  const handleSubmitComment = () => {
+  const handleSubmitComment = async () => {
     if (!newComment.trim() || isAddingComment) return;
     
     try {
@@ -79,8 +79,6 @@ export function PropertyComments({ propertyId }: PropertyCommentsProps) {
       }, 100);
     } catch (error) {
       console.error('Error adding comment:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -161,26 +159,26 @@ export function PropertyComments({ propertyId }: PropertyCommentsProps) {
           multiline
           className="flex-1 bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
           style={{ minHeight: 60, maxHeight: 120 }}
-          editable={!isLoading}
+          editable={!isAddingComment}
         />
         <Pressable
           onPress={handleSubmitComment}
-          disabled={!newComment.trim() || isLoading}
+          disabled={!newComment.trim() || isAddingComment}
           className={`
             w-12 h-12 rounded-lg items-center justify-center
-            ${newComment.trim() && !isLoading
+            ${newComment.trim() && !isAddingComment
               ? 'bg-blue-500 dark:bg-blue-600'
               : 'bg-gray-300 dark:bg-gray-600'
             }
             ${Platform.OS === 'web' ? 'hover:opacity-80' : ''}
           `}
           style={({ pressed }) => ({
-            opacity: pressed || isLoading ? 0.7 : 1,
+            opacity: pressed || isAddingComment ? 0.7 : 1,
           })}
         >
           <Send 
             size={20} 
-            color={newComment.trim() && !isLoading ? '#ffffff' : '#9ca3af'} 
+            color={newComment.trim() && !isAddingComment ? '#ffffff' : '#9ca3af'} 
           />
         </Pressable>
       </View>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/maplibre';
-import { useAuthStore } from '../../lib/store/authStore';
+import { useAuth } from '../../lib/query/useAuth';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
 import { hasValidCoordinates } from '../../lib/utils/coordinates';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -16,7 +16,7 @@ export default function MapTab() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [url, setUrl] = useState('');
 
-  const { user, initialize } = useAuthStore();
+  const { user } = useAuth();
   const {
     propertyLinks,
     addPropertyLink,
@@ -26,7 +26,6 @@ export default function MapTab() {
   } = usePropertyLinkStore();
 
   useEffect(() => {
-    initialize();
     loadFromDatabase();
   }, []);
 

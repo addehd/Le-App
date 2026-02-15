@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '../../lib/store/authStore';
+import { useAuth } from '../../lib/query/useAuth';
 import { usePropertyLinkStore } from '../../lib/store/propertyLinkStore';
 
 // Fallback map component (used when platform-specific file not available)
@@ -8,7 +8,7 @@ export default function MapTab() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [url, setUrl] = useState('');
 
-  const { user, initialize } = useAuthStore();
+  const { user } = useAuth();
   const {
     propertyLinks,
     addPropertyLink,
@@ -18,7 +18,6 @@ export default function MapTab() {
   } = usePropertyLinkStore();
 
   useEffect(() => {
-    initialize();
     loadFromDatabase();
   }, []);
 

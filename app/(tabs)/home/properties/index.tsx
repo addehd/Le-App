@@ -275,7 +275,7 @@ export default function PropertiesScreen() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAddProperty()}
                 placeholder="https://www.hemnet.se/bostad/..."
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isLoading}
+                disabled={isLoadingProperties}
               />
               <button
                 onClick={handlePaste}
@@ -360,7 +360,7 @@ export default function PropertiesScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              editable={!isLoading}
+              editable={!isLoadingProperties}
             />
             <Pressable
               onPress={handleAddProperty}
