@@ -1,24 +1,32 @@
-import { useState, useEffect } from 'react';
-import { Platform, View, Text, Pressable, ScrollView, TextInput, Image, Linking } from 'react-native';
+import { useState } from 'react';
+import { Platform, View, Text, Pressable, ScrollView, TextInput, Image, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react-native';
 import { PropertyLink } from '@/lib/store/propertyLinkStore';
 import { useProperties } from '@/lib/query/useProperties';
 import { usePropertyRealtimeSubscription } from '@/lib/query/useRealtimeSubscriptions';
 import { useAuth } from '@/lib/query/useAuth';
-import { fetchOGData, fetchGeocodeData } from './api';
+import { fetchPropertyMetadata, insertPropertyWithMetadata } from '@/lib/api/properties';
+import { fetchGeocodeData } from './api';
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return url;
+  }
+}
 
 function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove: () => void }) {
   const router = useRouter();
+  const isTemp = property.id.startsWith('temp-');
+  const hasMeta = !!property.title;
 
   const handlePress = () => {
-    // Navigate to property detail page
+    if (isTemp) return;
     router.push(`/home/properties/${property.id}`);
-  };
-
-  const handleOpenListing = (e: any) => {
-    e.stopPropagation();
-    Linking.openURL(property.url);
   };
 
   const formatPrice = (price?: number, currency?: string) => {
@@ -29,12 +37,12 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
   if (Platform.OS === 'web') {
     return (
       <div
-        className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+        className={`bg-white rounded-xl shadow-md overflow-hidden transition-shadow ${isTemp ? 'cursor-default' : 'hover:shadow-lg cursor-pointer'}`}
         onClick={handlePress}
       >
         <div className="flex">
           {/* Image */}
-          <div className="w-40 h-32 flex-shrink-0 bg-gray-200">
+          <div className="w-40 h-32 flex-shrink-0 bg-gray-100 flex items-center justify-center relative">
             {property.image ? (
               <img
                 src={property.image}
@@ -42,22 +50,49 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
-                🏠
+              <div className="w-full h-full flex items-center justify-center text-gray-300">
+                {isTemp && !hasMeta ? (
+                  <div className="animate-spin">
+                    <Loader2 size={28} color="#d1d5db" />
+                  </div>
+                ) : (
+                  <span className="text-4xl">🏠</span>
+                )}
+              </div>
+            )}
+            {isTemp && hasMeta && (
+              <div className="absolute top-1.5 right-1.5 bg-white/80 backdrop-blur rounded-full p-1 shadow-sm">
+                <div className="animate-spin">
+                  <Loader2 size={10} color="#9ca3af" />
+                </div>
               </div>
             )}
           </div>
 
           {/* Content */}
-          <div className="flex-1 p-4 flex flex-col justify-between">
+          <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
             <div>
-              <h3 className="font-semibold text-gray-900 text-lg line-clamp-1">
-                {property.title || 'Property'}
-              </h3>
+              {hasMeta ? (
+                <h3 className="font-semibold text-gray-900 text-lg line-clamp-1">
+                  {property.title}
+                </h3>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin flex-shrink-0">
+                    <Loader2 size={13} color="#9ca3af" />
+                  </div>
+                  <span className="text-gray-500 text-sm font-medium truncate">
+                    {extractDomain(property.url)}
+                  </span>
+                </div>
+              )}
               {property.description && (
                 <p className="text-gray-600 text-sm mt-1 line-clamp-2">
                   {property.description}
                 </p>
+              )}
+              {!hasMeta && (
+                <p className="text-gray-400 text-xs mt-1 truncate">{property.url}</p>
               )}
               {property.propertyData?.address && (
                 <p className="text-gray-500 text-xs mt-1">
@@ -84,16 +119,18 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
             </div>
           </div>
 
-          {/* Remove button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="p-2 text-gray-400 hover:text-red-500 self-start m-2"
-          >
-            ✕
-          </button>
+          {/* Remove button — hidden while saving */}
+          {!isTemp && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="p-2 text-gray-400 hover:text-red-500 self-start m-2 flex-shrink-0"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
     );
@@ -103,11 +140,12 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
   return (
     <Pressable
       onPress={handlePress}
+      disabled={isTemp}
       className="bg-white rounded-xl shadow-md overflow-hidden mb-3"
     >
       <View className="flex-row">
         {/* Image */}
-        <View className="w-32 h-28 bg-gray-200">
+        <View className="w-32 h-28 bg-gray-100 items-center justify-center relative">
           {property.image ? (
             <Image
               source={{ uri: property.image }}
@@ -116,7 +154,16 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
             />
           ) : (
             <View className="w-full h-full items-center justify-center">
-              <Text className="text-4xl">🏠</Text>
+              {isTemp && !hasMeta ? (
+                <ActivityIndicator size="small" color="#d1d5db" />
+              ) : (
+                <Text className="text-4xl">🏠</Text>
+              )}
+            </View>
+          )}
+          {isTemp && hasMeta && (
+            <View className="absolute top-1 right-1 bg-white rounded-full p-1">
+              <ActivityIndicator size="small" color="#9ca3af" />
             </View>
           )}
         </View>
@@ -124,14 +171,27 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
         {/* Content */}
         <View className="flex-1 p-3 justify-between">
           <View>
-            <Text className="font-semibold text-gray-900 text-base" numberOfLines={1}>
-              {property.title || 'Property'}
-            </Text>
-            {property.description && (
+            {hasMeta ? (
+              <Text className="font-semibold text-gray-900 text-base" numberOfLines={1}>
+                {property.title}
+              </Text>
+            ) : (
+              <View className="flex-row items-center gap-2">
+                <ActivityIndicator size="small" color="#9ca3af" />
+                <Text className="text-gray-500 text-sm font-medium" numberOfLines={1}>
+                  {extractDomain(property.url)}
+                </Text>
+              </View>
+            )}
+            {property.description ? (
               <Text className="text-gray-600 text-sm mt-1" numberOfLines={2}>
                 {property.description}
               </Text>
-            )}
+            ) : !hasMeta ? (
+              <Text className="text-gray-400 text-xs mt-1" numberOfLines={1}>
+                {property.url}
+              </Text>
+            ) : null}
           </View>
 
           <View className="flex-row items-center justify-between mt-2">
@@ -145,13 +205,12 @@ function PropertyCard({ property, onRemove }: { property: PropertyLink; onRemove
           </View>
         </View>
 
-        {/* Remove button */}
-        <Pressable
-          onPress={onRemove}
-          className="p-2 self-start"
-        >
-          <Text className="text-gray-400 text-lg">✕</Text>
-        </Pressable>
+        {/* Remove button — hidden while saving */}
+        {!isTemp && (
+          <Pressable onPress={onRemove} className="p-2 self-start">
+            <Text className="text-gray-400 text-lg">✕</Text>
+          </Pressable>
+        )}
       </View>
     </Pressable>
   );
@@ -189,41 +248,88 @@ function LoadingCard() {
 
 export default function PropertiesScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const {
     properties,
     isLoading: isLoadingProperties,
-    addProperty,
     deleteProperty,
   } = useProperties();
 
-  // Subscribe to realtime updates
   usePropertyRealtimeSubscription();
 
   const handleAddProperty = async () => {
     if (!url.trim()) return;
-
     setError(null);
 
+    const trimmedUrl = url.trim();
+    setUrl('');
+
+    const tempId = `temp-${Date.now()}`;
+    const sharedBy = user?.email || 'anon';
+
+    // 1. Show card immediately in the list
+    queryClient.setQueryData<PropertyLink[]>(['properties'], (old) => [
+      {
+        id: tempId,
+        url: trimmedUrl,
+        title: undefined,
+        sharedBy,
+        sharedAt: new Date().toISOString(),
+      },
+      ...(old || []),
+    ]);
+
+    // 2. Start geocode in parallel
+    const geocodePromise = fetchGeocodeData(trimmedUrl).catch(() => null);
+
     try {
-      // Fetch geocoding data (optional)
-      const geocodeData = await fetchGeocodeData(url).catch(() => null);
-      
-      const sharedBy = user?.email || 'anon';
-      
-      // Add property (metadata fetching happens in the API)
-      addProperty({
-        url: url.trim(),
+      // 3. Fetch OG metadata — card populates when this resolves
+      const metadata = await fetchPropertyMetadata(trimmedUrl);
+
+      // 4. Update card with OG data
+      queryClient.setQueryData<PropertyLink[]>(['properties'], (old) =>
+        (old || []).map((p) =>
+          p.id === tempId
+            ? {
+                ...p,
+                title: metadata.title,
+                description: metadata.description,
+                image: metadata.image,
+                images: metadata.images,
+                propertyData: metadata.propertyData,
+              }
+            : p
+        )
+      );
+
+      // 5. Wait for geocode
+      const geocodeData = await geocodePromise;
+
+      // 6. Save to DB with pre-fetched metadata
+      const saved = await insertPropertyWithMetadata({
+        url: trimmedUrl,
         sharedBy,
         latitude: geocodeData?.latitude,
         longitude: geocodeData?.longitude,
+        title: metadata.title,
+        description: metadata.description,
+        image: metadata.image,
+        images: metadata.images,
+        propertyData: metadata.propertyData,
       });
-      
-      setUrl('');
+
+      // 7. Replace temp entry with real DB entry
+      queryClient.setQueryData<PropertyLink[]>(['properties'], (old) =>
+        (old || []).map((p) => (p.id === tempId ? saved : p))
+      );
     } catch (err: any) {
       console.error('Error adding property:', err);
+      queryClient.setQueryData<PropertyLink[]>(['properties'], (old) =>
+        (old || []).filter((p) => p.id !== tempId)
+      );
       setError(err.message || 'Failed to add property');
     }
   };
@@ -275,7 +381,6 @@ export default function PropertiesScreen() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAddProperty()}
                 placeholder="https://www.hemnet.se/bostad/..."
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isLoadingProperties}
               />
               <button
                 onClick={handlePaste}
@@ -360,7 +465,6 @@ export default function PropertiesScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              editable={!isLoadingProperties}
             />
             <Pressable
               onPress={handleAddProperty}
@@ -391,18 +495,18 @@ export default function PropertiesScreen() {
                 Inga bostäder än
               </Text>
               <Text className="text-gray-600 text-center">
-              Klistra in en länk från Hemnet, Booli eller annan bostadssajt
-            </Text>
-          </View>
-        ) : (
-          properties.map((property) => (
-            <PropertyCard
-              key={property.id}
-              property={property}
-              onRemove={() => deleteProperty(property.id)}
-            />
-          ))
-        )}
+                Klistra in en länk från Hemnet, Booli eller annan bostadssajt
+              </Text>
+            </View>
+          ) : (
+            properties.map((property) => (
+              <PropertyCard
+                key={property.id}
+                property={property}
+                onRemove={() => deleteProperty(property.id)}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

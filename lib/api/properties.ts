@@ -213,6 +213,64 @@ export async function fetchPropertyMetadata(url: string): Promise<{
 }
 
 /**
+ * Insert a property with pre-fetched metadata (skips OG fetch)
+ */
+export interface InsertPropertyWithMetadataInput {
+  url: string;
+  sharedBy: string;
+  latitude?: number;
+  longitude?: number;
+  title?: string;
+  description?: string;
+  image?: string;
+  images?: string[];
+  propertyData?: PropertyLinkData;
+}
+
+export async function insertPropertyWithMetadata(
+  input: InsertPropertyWithMetadataInput
+): Promise<PropertyLink> {
+  const pd = input.propertyData;
+
+  const { data, error } = await supabase
+    .from('properties')
+    .insert({
+      url: input.url,
+      title: input.title,
+      description: input.description,
+      image_url: input.image,
+      images: input.images,
+      shared_by: input.sharedBy,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      address: pd?.address,
+      municipality: pd?.city,
+      price: pd?.price,
+      rooms: pd?.bedrooms,
+      area_sqm: pd?.area,
+      monthly_fee: pd?.monthlyFee,
+      floor: typeof pd?.floor === 'number' ? pd.floor : undefined,
+      property_type: pd?.propertyType,
+      year_built: pd?.buildYear,
+      has_elevator: typeof pd?.elevator === 'boolean' ? pd.elevator : undefined,
+      has_balcony: typeof pd?.balcony === 'boolean' ? pd.balcony : undefined,
+      energy_class: pd?.energyClass,
+      enrichment_status: pd
+        ? { enrichmentStatus: pd.enrichmentStatus, lastEnriched: pd.lastEnriched, currency: pd.currency }
+        : {},
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to insert property:', error);
+    throw error;
+  }
+
+  return rowToPropertyLink(data as PropertiesRow);
+}
+
+/**
  * Add a new property
  */
 export async function addProperty(input: AddPropertyInput): Promise<PropertyLink> {
