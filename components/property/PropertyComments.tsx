@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { useComments } from '../../lib/query/useComments';
 import { useCommentsRealtimeSubscription } from '../../lib/query/useRealtimeSubscriptions';
 import { useAuth } from '../../lib/query/useAuth';
+import { getAnonUserInfo } from '../../lib/utils/anonUser';
 import { PropertyComment } from '../../lib/types/property';
 import { CommentItem } from './CommentItem';
 import { Send } from 'lucide-react-native';
@@ -34,17 +35,7 @@ export function PropertyComments({ propertyId }: PropertyCommentsProps) {
       const name = user.email.split('@')[0];
       return { id: user.email, name };
     }
-    
-    // Get or create anonymous ID
-    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
-      let anonId = window.localStorage.getItem('anon-user-id');
-      if (!anonId) {
-        anonId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        window.localStorage.setItem('anon-user-id', anonId);
-      }
-      return { id: anonId, name: 'Anonymous User' };
-    }
-    return { id: `anon-${Date.now()}`, name: 'Anonymous User' };
+    return getAnonUserInfo();
   };
 
   // Build threaded comment structure

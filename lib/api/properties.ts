@@ -15,19 +15,83 @@ export interface AddPropertyInput {
   longitude?: number;
 }
 
-export interface PropertyResponse {
-  id: string;
+// Row shape returned by the `properties` table
+interface PropertiesRow {
+  id: number;
   url: string;
   title?: string;
   description?: string;
-  image?: string;
+  image_url?: string;
   images?: string[];
-  shared_by: string;
-  shared_at: string;
-  latitude?: number;
-  longitude?: number;
-  property_data?: PropertyLinkData;
-  financial_data?: FinancialData;
+  site_name?: string;
+  address?: string;
+  municipality?: string;
+  latitude?: string | number;
+  longitude?: string | number;
+  price?: number;
+  price_per_sqm?: number;
+  property_type?: string;
+  tenure_type?: string;
+  rooms?: number;
+  area_sqm?: number;
+  floor?: number;
+  total_floors?: number;
+  has_elevator?: boolean;
+  has_balcony?: boolean;
+  year_built?: number;
+  energy_class?: string;
+  association_name?: string;
+  monthly_fee?: number;
+  visits?: number;
+  agent_name?: string;
+  listing_date?: string;
+  enrichment_status?: Record<string, unknown>;
+  shared_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+function rowToPropertyLink(row: PropertiesRow): PropertyLink {
+  const enrichment = (row.enrichment_status || {}) as Record<string, unknown>;
+
+  const hasPropertyData =
+    row.address || row.municipality || row.price || row.rooms ||
+    row.area_sqm || enrichment.enrichmentStatus;
+
+  const propertyData: PropertyLinkData | undefined = hasPropertyData
+    ? {
+        price: row.price,
+        address: row.address,
+        city: row.municipality,
+        bedrooms: row.rooms,
+        area: row.area_sqm,
+        monthlyFee: row.monthly_fee,
+        floor: row.floor,
+        propertyType: row.property_type,
+        buildYear: row.year_built,
+        elevator: row.has_elevator,
+        balcony: row.has_balcony,
+        energyClass: row.energy_class,
+        enrichmentStatus: enrichment.enrichmentStatus as PropertyLinkData['enrichmentStatus'],
+        lastEnriched: enrichment.lastEnriched as string | undefined,
+        currency: enrichment.currency as string | undefined,
+      }
+    : undefined;
+
+  return {
+    id: row.id.toString(),
+    url: row.url,
+    title: row.title,
+    description: row.description,
+    image: row.image_url,
+    images: row.images,
+    sharedBy: row.shared_by || 'anon',
+    sharedAt: row.created_at || new Date().toISOString(),
+    latitude: row.latitude != null ? Number(row.latitude) : undefined,
+    longitude: row.longitude != null ? Number(row.longitude) : undefined,
+    propertyData,
+    financialData: enrichment.financialData as FinancialData | undefined,
+  };
 }
 
 /**
@@ -35,30 +99,16 @@ export interface PropertyResponse {
  */
 export async function fetchProperties(): Promise<PropertyLink[]> {
   const { data, error } = await supabase
-    .from('property_links')
+    .from('properties')
     .select('*')
-    .order('shared_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Failed to fetch properties:', error);
     throw error;
   }
 
-  // Convert from snake_case (database) to camelCase (app)
-  return (data || []).map((item: PropertyResponse) => ({
-    id: item.id,
-    url: item.url,
-    title: item.title,
-    description: item.description,
-    image: item.image,
-    images: item.images,
-    sharedBy: item.shared_by,
-    sharedAt: item.shared_at,
-    latitude: item.latitude,
-    longitude: item.longitude,
-    propertyData: item.property_data,
-    financialData: item.financial_data,
-  }));
+  return (data || []).map((item: PropertiesRow) => rowToPropertyLink(item));
 }
 
 /**
@@ -166,38 +216,35 @@ export async function fetchPropertyMetadata(url: string): Promise<{
  * Add a new property
  */
 export async function addProperty(input: AddPropertyInput): Promise<PropertyLink> {
-  // Fetch metadata first
   const metadata = await fetchPropertyMetadata(input.url);
+  const pd = metadata.propertyData;
 
-  const newProperty: Omit<PropertyLink, 'id'> & { id?: string } = {
-    id: Date.now().toString(),
-    url: input.url,
-    title: metadata.title,
-    description: metadata.description,
-    image: metadata.image,
-    images: metadata.images,
-    sharedBy: input.sharedBy,
-    sharedAt: new Date().toISOString(),
-    latitude: input.latitude,
-    longitude: input.longitude,
-    propertyData: metadata.propertyData,
-  };
-
-  // Save to Supabase
   const { data, error } = await supabase
-    .from('property_links')
+    .from('properties')
     .insert({
-      id: newProperty.id,
-      url: newProperty.url,
-      title: newProperty.title,
-      description: newProperty.description,
-      image: newProperty.image,
-      images: newProperty.images,
-      shared_by: newProperty.sharedBy,
-      shared_at: newProperty.sharedAt,
-      latitude: newProperty.latitude,
-      longitude: newProperty.longitude,
-      property_data: newProperty.propertyData,
+      url: input.url,
+      title: metadata.title,
+      description: metadata.description,
+      image_url: metadata.image,
+      images: metadata.images,
+      shared_by: input.sharedBy,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      address: pd?.address,
+      municipality: pd?.city,
+      price: pd?.price,
+      rooms: pd?.bedrooms,
+      area_sqm: pd?.area,
+      monthly_fee: pd?.monthlyFee,
+      floor: typeof pd?.floor === 'number' ? pd.floor : undefined,
+      property_type: pd?.propertyType,
+      year_built: pd?.buildYear,
+      has_elevator: typeof pd?.elevator === 'boolean' ? pd.elevator : undefined,
+      has_balcony: typeof pd?.balcony === 'boolean' ? pd.balcony : undefined,
+      energy_class: pd?.energyClass,
+      enrichment_status: pd
+        ? { enrichmentStatus: pd.enrichmentStatus, lastEnriched: pd.lastEnriched, currency: pd.currency }
+        : {},
     })
     .select()
     .single();
@@ -207,21 +254,7 @@ export async function addProperty(input: AddPropertyInput): Promise<PropertyLink
     throw error;
   }
 
-  // Return camelCase version
-  return {
-    id: data.id,
-    url: data.url,
-    title: data.title,
-    description: data.description,
-    image: data.image,
-    images: data.images,
-    sharedBy: data.shared_by,
-    sharedAt: data.shared_at,
-    latitude: data.latitude,
-    longitude: data.longitude,
-    propertyData: data.property_data,
-    financialData: data.financial_data,
-  };
+  return rowToPropertyLink(data as PropertiesRow);
 }
 
 /**
@@ -231,18 +264,42 @@ export async function updateProperty(
   id: string,
   updates: Partial<PropertyLink>
 ): Promise<PropertyLink> {
+  const pd = updates.propertyData;
+  const fd = updates.financialData;
+
+  const payload: Record<string, unknown> = {};
+
+  if (updates.title !== undefined) payload.title = updates.title;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.image !== undefined) payload.image_url = updates.image;
+  if (updates.images !== undefined) payload.images = updates.images;
+  if (updates.latitude !== undefined) payload.latitude = updates.latitude;
+  if (updates.longitude !== undefined) payload.longitude = updates.longitude;
+
+  if (pd) {
+    if (pd.address !== undefined) payload.address = pd.address;
+    if (pd.city !== undefined) payload.municipality = pd.city;
+    if (pd.price !== undefined) payload.price = pd.price;
+    if (pd.bedrooms !== undefined) payload.rooms = pd.bedrooms;
+    if (pd.area !== undefined) payload.area_sqm = pd.area;
+    if (pd.monthlyFee !== undefined) payload.monthly_fee = pd.monthlyFee;
+    if (typeof pd.floor === 'number') payload.floor = pd.floor;
+    if (pd.propertyType !== undefined) payload.property_type = pd.propertyType;
+    if (pd.buildYear !== undefined) payload.year_built = pd.buildYear;
+    if (typeof pd.elevator === 'boolean') payload.has_elevator = pd.elevator;
+    if (typeof pd.balcony === 'boolean') payload.has_balcony = pd.balcony;
+    if (pd.energyClass !== undefined) payload.energy_class = pd.energyClass;
+    payload.enrichment_status = {
+      enrichmentStatus: pd.enrichmentStatus,
+      lastEnriched: pd.lastEnriched,
+      currency: pd.currency,
+      ...(fd ? { financialData: fd } : {}),
+    };
+  }
+
   const { data, error } = await supabase
-    .from('property_links')
-    .update({
-      title: updates.title,
-      description: updates.description,
-      image: updates.image,
-      images: updates.images,
-      latitude: updates.latitude,
-      longitude: updates.longitude,
-      property_data: updates.propertyData,
-      financial_data: updates.financialData,
-    })
+    .from('properties')
+    .update(payload)
     .eq('id', id)
     .select()
     .single();
@@ -252,20 +309,7 @@ export async function updateProperty(
     throw error;
   }
 
-  return {
-    id: data.id,
-    url: data.url,
-    title: data.title,
-    description: data.description,
-    image: data.image,
-    images: data.images,
-    sharedBy: data.shared_by,
-    sharedAt: data.shared_at,
-    latitude: data.latitude,
-    longitude: data.longitude,
-    propertyData: data.property_data,
-    financialData: data.financial_data,
-  };
+  return rowToPropertyLink(data as PropertiesRow);
 }
 
 /**
@@ -273,7 +317,7 @@ export async function updateProperty(
  */
 export async function deleteProperty(id: string): Promise<void> {
   const { error } = await supabase
-    .from('property_links')
+    .from('properties')
     .delete()
     .eq('id', id);
 
@@ -284,15 +328,26 @@ export async function deleteProperty(id: string): Promise<void> {
 }
 
 /**
- * Update financial data for a property
+ * Update financial data for a property — stored inside enrichment_status jsonb
  */
 export async function updateFinancialData(
   id: string,
   financialData: FinancialData
 ): Promise<void> {
+  const { data: existing } = await supabase
+    .from('properties')
+    .select('enrichment_status')
+    .eq('id', id)
+    .single();
+
   const { error } = await supabase
-    .from('property_links')
-    .update({ financial_data: financialData })
+    .from('properties')
+    .update({
+      enrichment_status: {
+        ...(existing?.enrichment_status || {}),
+        financialData,
+      },
+    })
     .eq('id', id);
 
   if (error) {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useReactions } from '../../lib/query/useReactions';
 import { useReactionsRealtimeSubscription } from '../../lib/query/useRealtimeSubscriptions';
 import { useAuth } from '../../lib/query/useAuth';
+import { getAnonId } from '../../lib/utils/anonUser';
 
 interface PropertyReactionsProps {
   propertyId: string;
@@ -23,17 +24,7 @@ export function PropertyReactions({ propertyId }: PropertyReactionsProps) {
   // Get user ID (authenticated or anonymous)
   const getUserId = () => {
     if (user?.email) return user.email;
-    
-    // Get or create anonymous ID
-    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
-      let anonId = window.localStorage.getItem('anon-user-id');
-      if (!anonId) {
-        anonId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        window.localStorage.setItem('anon-user-id', anonId);
-      }
-      return anonId;
-    }
-    return `anon-${Date.now()}`;
+    return getAnonId();
   };
 
   // Count reactions by emoji

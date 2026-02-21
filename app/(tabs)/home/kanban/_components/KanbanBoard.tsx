@@ -1,11 +1,11 @@
 import { View, Text, ScrollView, Platform, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
-import { ColumnComponent, type Column } from './Column';
-import type { Card } from './Card';
+import { ColumnComponent, type Column } from '../../../../../components/kanban/Column';
+import type { Card } from '../../../../../components/kanban/Card';
 import { ProjectStore } from '../../../../../lib/store/projectStore';
 import { KanbanStore, DEFAULT_COLUMNS } from '../../../../../lib/store/kanbanStore';
-import { VimShortcuts } from './VimShortcuts';
+import { VimShortcuts } from '../../../../../components/kanban/VimShortcuts';
 
 interface KanbanBoardProps {
   projectId?: string;
